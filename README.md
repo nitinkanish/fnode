@@ -30,7 +30,13 @@ The installer lives in this repo at [`public/FNode.dmg`](public/FNode.dmg). macO
 
 1. Open the disk image.
 2. Drag **FNode** into Applications.
-3. First launch from the web: right-click the app → **Open** (the build is signed with hardened runtime; Apple notarization is not included).
+3. If macOS shows **“Apple could not verify FNode.dmg is free of malware”**, the file was downloaded without Apple notarization. That dialog is Gatekeeper, not a broken installer:
+   - Open **System Settings → Privacy & Security**
+   - Scroll to the FNode message and choose **Open Anyway**
+   - Confirm **Open**
+4. Prefer **build from source** (`pnpm tauri dev` / `pnpm tauri build`) if you want to skip the download warning on this Mac.
+
+A Gatekeeper-clean download (no warning) requires a **Developer ID Application** certificate and Apple notarization. `Apple Development` signatures are for local debug only — browsers add a quarantine flag, and recent macOS will refuse to open that DMG until you use Open Anyway. See **Notarized release** below.
 
 Intel Macs: build from source with `pnpm tauri build` on that machine.
 
@@ -119,6 +125,28 @@ pnpm tauri build
 ```
 
 The `.app` is written to `src-tauri/target/release/bundle/macos/` and the installer to `src-tauri/target/release/bundle/dmg/`. Copy the DMG to `public/FNode.dmg` so the download link above matches the release.
+
+That local build still uses an **Apple Development** identity unless a Developer ID is in the keychain. Downloading that DMG from GitHub will trigger Gatekeeper.
+
+### Notarized release (no Gatekeeper warning)
+
+Needs team **YLKU69SJ9T** (DEBUGGED PRO PRIVATE LIMITED):
+
+1. Account Holder or Admin creates a **Developer ID Application** certificate and installs it on the build Mac
+2. App Store Connect API key, or Apple ID + [app-specific password](https://appleid.apple.com)
+3. Run:
+
+```bash
+export APPLE_SIGNING_IDENTITY="Developer ID Application: DEBUGGED PRO PRIVATE LIMITED (YLKU69SJ9T)"
+export APPLE_TEAM_ID=YLKU69SJ9T
+# API key (preferred)
+export APPLE_API_KEY=KEY_ID
+export APPLE_API_ISSUER=ISSUER_UUID
+export APPLE_API_KEY_PATH=/path/to/AuthKey_KEY_ID.p8
+pnpm run build:macos:notarized
+```
+
+The script signs, notarizes, staples, and writes `public/FNode.dmg`. Apple Development certificates cannot be notarized.
 
 ## Architecture
 

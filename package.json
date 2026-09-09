@@ -11,7 +11,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "build:macos": "tauri build --bundles app,dmg"
+    "build:macos": "tauri build --bundles app,dmg",
+    "build:macos:notarized": "bash scripts/build-macos-release.sh"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.23",

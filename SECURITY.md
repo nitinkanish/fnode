@@ -21,6 +21,12 @@ FNode is a **local-first** macOS app. Scanning, process control, Docker, and SQL
 
 Data lives at `~/Library/Application Support/com.nitinkanish.fnode/` (`fnode.db` + captured restart logs). Older installs under `com.fnode.app` are copied on first launch.
 
+## Distribution signing
+
+GitHub / browser downloads are checked by macOS Gatekeeper. A production DMG must be signed with a **Developer ID Application** certificate and **notarized** by Apple. An `Apple Development` signature is only valid for local debugging; it will show “Apple could not verify this is free of malware” after download.
+
+Build a notarized installer with `pnpm run build:macos:notarized` once the Developer ID certificate and notary credentials are on the build machine. See the README.
+
 ## Reporting a vulnerability
 
 Please **do not** open a public issue for security bugs.
