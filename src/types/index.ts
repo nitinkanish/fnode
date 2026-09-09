@@ -24,6 +24,7 @@ export interface SystemSnapshot {
   networkTxBytes: number;
   networkRxPerSec: number;
   networkTxPerSec: number;
+  temperatureC: number | null;
 }
 
 export interface ChartProc {
@@ -69,6 +70,10 @@ export interface LiveSnapshot {
   processes: DevProcess[];
   topCpu: ChartProc[];
   topMemory: ChartProc[];
+  softwareGroups: SoftwareGroup[];
+  guiApps: SoftwareGroup[];
+  localhostApps: LocalhostApp[];
+  health: SystemHealth;
   paths: AppPaths;
 }
 
@@ -96,6 +101,106 @@ export interface DevProcess {
   safeEnv: EnvVar[];
   exe: string | null;
   status: string;
+  software: string;
+}
+
+export interface SoftwareGroup {
+  id: string;
+  name: string;
+  kind: string;
+  cpu: number;
+  memoryBytes: number;
+  processCount: number;
+  pids: number[];
+  ports: number[];
+  canStop: boolean;
+}
+
+export interface LocalhostApp {
+  pid: number;
+  name: string;
+  software: string;
+  port: number;
+  address: string;
+  cpu: number;
+  memoryBytes: number;
+  cwd: string | null;
+  canStop: boolean;
+}
+
+export interface HealthAlert {
+  id: string;
+  severity: string;
+  title: string;
+  body: string;
+}
+
+export interface SystemHealth {
+  score: number;
+  status: string;
+  temperatureC: number | null;
+  cpuSpeedLimit: number | null;
+  cpuPct: number;
+  memoryPct: number;
+  diskPct: number;
+  loadRatio: number;
+  alerts: HealthAlert[];
+}
+
+export interface CacheEntry {
+  id: string;
+  label: string;
+  description: string;
+  afterClear: string;
+  path: string;
+  bytes: number;
+  files: number;
+  exists: boolean;
+  scanned: boolean;
+}
+
+export interface CacheSyscall {
+  name: string;
+  purpose: string;
+}
+
+export interface CacheGuide {
+  title: string;
+  summary: string;
+  does: string[];
+  never: string[];
+  syscalls: CacheSyscall[];
+  categories: CacheEntry[];
+}
+
+export interface CacheProgress {
+  job: string;
+  phase: string;
+  syscall: string;
+  path: string;
+  message: string;
+  bytes: number;
+  files: number;
+  skipped: number;
+  done: boolean;
+}
+
+export interface CacheClearResult {
+  id: string;
+  label: string;
+  path: string;
+  bytes: number;
+  files: number;
+  dirs: number;
+  skipped: number;
+}
+
+export interface AppNotice {
+  id: string;
+  severity: "warning" | "critical" | "info";
+  title: string;
+  body: string;
+  ts: number;
 }
 
 export interface Project {
@@ -195,9 +300,11 @@ export interface HistoryPoint {
 
 export type PageId =
   | "dashboard"
+  | "apps"
   | "ports"
   | "processes"
   | "projects"
   | "docker"
   | "ai"
+  | "cache"
   | "settings";

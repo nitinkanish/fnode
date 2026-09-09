@@ -7,6 +7,7 @@ use rusqlite::Connection;
 use sysinfo::{Networks, ProcessesToUpdate, System};
 
 use crate::db;
+use crate::health;
 use crate::models::{AppPaths, ChartProc, DevProcess, LiveSnapshot};
 use crate::paths;
 use crate::port_scanner;
@@ -168,6 +169,17 @@ impl AppState {
         let mut top_ports = ports.clone();
         top_ports.truncate(8);
 
+        let all_groups = process_scanner::group_software(&processes);
+        let mut gui_apps = process_scanner::gui_apps(&all_groups);
+        gui_apps.truncate(80);
+        let mut software_groups = all_groups;
+        software_groups.truncate(40);
+        let localhost_apps = process_scanner::localhost_apps(&ports, &processes);
+        let mut health = health::evaluate(&system);
+        health.temperature_c = health.temperature_c.or(system.temperature_c);
+        let mut system = system;
+        system.temperature_c = health.temperature_c;
+
         LiveSnapshot {
             system,
             open_ports: ports.len(),
@@ -181,6 +193,10 @@ impl AppState {
             processes,
             top_cpu,
             top_memory,
+            software_groups,
+            gui_apps,
+            localhost_apps,
+            health,
             paths: self.app_paths(),
         }
     }

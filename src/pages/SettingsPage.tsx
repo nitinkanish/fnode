@@ -13,6 +13,7 @@ import { useAppStore } from "@/store/appStore";
 export function SettingsPage() {
   const settings = useAppStore((s) => s.settings);
   const loadSettings = useAppStore((s) => s.loadSettings);
+  const setPage = useAppStore((s) => s.setPage);
   const [apiKey, setApiKey] = useState("");
   const [roots, setRoots] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -74,6 +75,20 @@ export function SettingsPage() {
           {paths.executable && (
             <PathBlock label="Executable" path={paths.executable} home={paths.homeDir} folder={parentOf(paths.executable)} />
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-foreground">Cache cleaner</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Cache scan and delete live in their own module, with a full explanation of the OS calls and a live log while files are removed.
+          </p>
+          <Button variant="outline" onClick={() => setPage("cache")}>
+            Open cache cleaner
+          </Button>
         </CardContent>
       </Card>
 

@@ -1,11 +1,13 @@
 import {
   Activity,
+  AppWindow,
   Box,
   FolderGit2,
   LayoutDashboard,
   Radio,
   Settings,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import { APP_AUTHOR, APP_NAME, APP_TAGLINE } from "@/brand";
 import { cn } from "@/lib/utils";
@@ -14,11 +16,13 @@ import type { PageId } from "@/types";
 
 const items: { id: PageId; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "apps", label: "Apps", icon: AppWindow },
   { id: "ports", label: "Ports", icon: Radio },
   { id: "processes", label: "Processes", icon: Activity },
   { id: "projects", label: "Projects", icon: FolderGit2 },
   { id: "docker", label: "Docker", icon: Box },
   { id: "ai", label: "AI Models", icon: Sparkles },
+  { id: "cache", label: "Cache", icon: Trash2 },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 

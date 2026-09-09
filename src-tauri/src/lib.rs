@@ -1,11 +1,13 @@
 mod ai_detector;
 mod assistant;
+mod cache;
 mod commands;
 mod control;
 mod db;
 mod dock_icon;
 mod docker;
 mod error;
+mod health;
 mod models;
 mod paths;
 mod port_scanner;
@@ -17,6 +19,8 @@ mod system_monitor;
 use state::AppState;
 use sysinfo::{ProcessesToUpdate, System};
 use tauri::Manager;
+
+/// FNode desktop shell.
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -57,6 +61,10 @@ pub fn run() {
             commands::ai_stop,
             commands::ai_open_chat,
             commands::kill_process,
+            commands::kill_processes,
+            commands::get_cache_guide,
+            commands::inspect_caches,
+            commands::clear_cache,
             commands::restart_process,
             commands::open_terminal,
             commands::open_folder,

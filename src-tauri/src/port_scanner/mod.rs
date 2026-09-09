@@ -73,6 +73,7 @@ pub fn enrich(sys: &System, raw: Vec<RawListen>) -> Vec<PortInfo> {
                     safe_env: Vec::new(),
                     exe: None,
                     status: "unknown".into(),
+                    software: row.command.clone(),
                 }
             });
 

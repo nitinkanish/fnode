@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Box, Cpu, FolderGit2, HardDrive, Radio, Sparkles, Wifi } from "lucide-react";
+import { AppWindow, Box, Cpu, FolderGit2, HardDrive, HeartPulse, Radio, Sparkles, Wifi } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,15 @@ import { api } from "@/services/tauri";
 import { useAppStore } from "@/store/appStore";
 
 const CORE_COLORS = ["#f38064", "#818cf8", "#38bdf8", "#34d399", "#fbbf24", "#f472b6"];
+
+function HealthStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-lg font-semibold tracking-tight">{value}</div>
+      <p className="text-xs text-muted-foreground">{label}</p>
+    </div>
+  );
+}
 
 export function DashboardPage() {
   const overview = useAppStore((s) => s.overview);
@@ -50,14 +59,66 @@ export function DashboardPage() {
     name: `${index}`,
     cpu: Number(cpu.toFixed(1)),
   }));
-  const topCpu = overview.topCpu.map((proc) => ({
-    name: proc.name.length > 16 ? `${proc.name.slice(0, 16)}…` : proc.name,
-    cpu: Number(proc.cpu.toFixed(1)),
-    memory: proc.memoryBytes,
+  const health = overview.health;
+  const groups = overview.softwareGroups ?? [];
+  const hottest = groups.slice(0, 8).map((group) => ({
+    name: group.name.length > 18 ? `${group.name.slice(0, 18)}…` : group.name,
+    cpu: Number(group.cpu.toFixed(1)),
   }));
 
   return (
     <div className="space-y-6">
+      {health?.alerts?.length > 0 && (
+        <div className="space-y-2">
+          {health.alerts.map((alert) => (
+            <div
+              key={alert.id}
+              className={`rounded-xl border px-4 py-3 text-sm ${
+                alert.severity === "critical"
+                  ? "border-red-500/30 bg-red-500/10 text-red-200"
+                  : "border-amber-500/30 bg-amber-500/10 text-amber-100"
+              }`}
+            >
+              <div className="font-medium">{alert.title}</div>
+              <p className="mt-0.5 text-xs opacity-80">{alert.body}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {health && (
+        <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <HeartPulse className="h-3.5 w-3.5" />
+              System health
+            </CardTitle>
+            <Badge variant={health.status === "healthy" ? "success" : health.status === "watch" ? "warning" : "danger"}>
+              {health.status}
+            </Badge>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-5">
+              <div>
+                <div className="text-3xl font-semibold tracking-tight">{health.score}</div>
+                <p className="text-xs text-muted-foreground">Health score</p>
+              </div>
+              <HealthStat label="CPU" value={formatPercent(health.cpuPct)} />
+              <HealthStat label="Memory" value={formatPercent(health.memoryPct)} />
+              <HealthStat
+                label="Temperature"
+                value={health.temperatureC != null ? `${health.temperatureC.toFixed(0)}°C` : "—"}
+              />
+              <HealthStat
+                label="CPU speed"
+                value={health.cpuSpeedLimit != null ? `${health.cpuSpeedLimit}%` : "full"}
+              />
+            </div>
+            <Progress className="mt-4" value={health.score} />
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           title="CPU"
@@ -91,8 +152,14 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
         <CountCard icon={Cpu} label="Processes" value={system.processCount} onClick={() => setPage("processes")} />
+        <CountCard
+          icon={AppWindow}
+          label="Apps"
+          value={(overview.guiApps ?? []).length}
+          onClick={() => setPage("apps")}
+        />
         <CountCard icon={Radio} label="Open ports" value={overview.openPorts} onClick={() => setPage("ports")} />
         <CountCard
           icon={Box}
@@ -190,21 +257,54 @@ export function DashboardPage() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader>
-            <CardTitle>Hottest processes</CardTitle>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle>Hottest software</CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => setPage("apps")}>
+              Apps
+            </Button>
           </CardHeader>
           <CardContent className="h-52">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topCpu} layout="vertical" margin={{ left: 16 }}>
-                <XAxis type="number" hide />
-                <YAxis type="category" dataKey="name" width={110} tick={{ fill: "#a1a1aa", fontSize: 11 }} />
-                <Tooltip contentStyle={chartTooltip} formatter={(value) => [`${value}%`, "CPU"]} />
-                <Bar dataKey="cpu" fill="#f38064" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {hottest.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No process groups yet.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={hottest} layout="vertical" margin={{ left: 16 }}>
+                  <XAxis type="number" hide />
+                  <YAxis type="category" dataKey="name" width={110} tick={{ fill: "#a1a1aa", fontSize: 11 }} />
+                  <Tooltip contentStyle={chartTooltip} formatter={(value) => [`${value}%`, "CPU"]} />
+                  <Bar dataKey="cpu" fill="#f38064" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </div>
+
+      {groups.length > 0 && (
+        <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle>Hottest processes by software</CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => setPage("processes")}>
+              Processes
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {groups.slice(0, 8).map((group) => (
+              <div key={group.id} className="flex items-center gap-3">
+                <div className="w-40 shrink-0 truncate text-sm">{group.name}</div>
+                <div className="min-w-0 flex-1">
+                  <Progress value={Math.min(100, group.cpu)} />
+                </div>
+                <div className="w-16 text-right text-xs tabular-nums">{formatPercent(group.cpu)}</div>
+                <div className="w-20 text-right text-xs text-muted-foreground">{formatBytes(group.memoryBytes)}</div>
+                <div className="w-16 text-right text-[11px] text-muted-foreground">
+                  {group.processCount} proc
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-3 xl:grid-cols-3">
         <Card>
@@ -230,7 +330,7 @@ export function DashboardPage() {
         <Card className="xl:col-span-2">
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle>Listening now</CardTitle>
-            <Button variant="ghost" size="sm" onClick={() => setPage("ports")}>
+            <Button variant="ghost" size="sm" onClick={() => setPage("apps")}>
               View all
             </Button>
           </CardHeader>

@@ -9,7 +9,7 @@ use std::path::Path;
 
 use sysinfo::{Pid, Process, System};
 
-use crate::models::{DevProcess, EnvVar};
+use crate::models::{DevProcess, EnvVar, LocalhostApp, PortInfo, SoftwareGroup};
 
 const DEV_RUNTIMES: &[&str] = &[
     "node", "nodejs", "npm", "npx", "pnpm", "yarn", "bun", "deno",
@@ -57,6 +57,8 @@ pub fn classify_process(process: &Process, listening_ports: &[u16]) -> DevProces
     let runtime = detect_runtime(&name, &command);
     let framework = detect_framework(&command, cwd.as_deref());
     let display_name = display_name_for(&name, cwd.as_deref(), framework.as_deref());
+    let exe = process.exe().map(|p| p.to_string_lossy().into_owned());
+    let software = software_name(exe.as_deref(), &name, &display_name);
     let is_dev_service = runtime.is_some()
         || !listening_ports.is_empty()
         || looks_like_dev_command(&command);
@@ -76,8 +78,9 @@ pub fn classify_process(process: &Process, listening_ports: &[u16]) -> DevProces
         ports: listening_ports.to_vec(),
         is_dev_service,
         safe_env: safe_environment(process),
-        exe: process.exe().map(|p| p.to_string_lossy().into_owned()),
+        exe,
         status: format!("{:?}", process.status()),
+        software,
     }
 }
 
@@ -306,4 +309,146 @@ fn truncate(value: &str, max: usize) -> String {
     } else {
         format!("{}…", &value[..max])
     }
+}
+
+const PROTECTED_SOFTWARE: &[&str] = &[
+    "kernel_task",
+    "launchd",
+    "WindowServer",
+    "loginwindow",
+    "sysmond",
+    "UserEventAgent",
+    "cfprefsd",
+    "FNode",
+    "fnode",
+];
+
+pub fn software_name(exe: Option<&str>, name: &str, display: &str) -> String {
+    if let Some(exe) = exe {
+        if let Some(app) = app_bundle_name(exe) {
+            return app;
+        }
+    }
+    if !display.is_empty() {
+        display.to_string()
+    } else {
+        name.to_string()
+    }
+}
+
+fn app_bundle_name(exe: &str) -> Option<String> {
+    let path = Path::new(exe);
+    for ancestor in path.ancestors() {
+        if ancestor.extension().and_then(|ext| ext.to_str()) == Some("app") {
+            return ancestor
+                .file_stem()
+                .map(|stem| stem.to_string_lossy().into_owned());
+        }
+    }
+    None
+}
+
+pub fn is_gui_app(exe: Option<&str>) -> bool {
+    exe.is_some_and(|path| path.contains(".app/"))
+}
+
+pub fn can_stop_name(name: &str) -> bool {
+    !PROTECTED_SOFTWARE
+        .iter()
+        .any(|protected| name.eq_ignore_ascii_case(protected))
+}
+
+pub fn group_software(processes: &[DevProcess]) -> Vec<SoftwareGroup> {
+    let mut map: HashMap<String, SoftwareGroup> = HashMap::new();
+    for proc in processes {
+        let entry = map.entry(proc.software.clone()).or_insert_with(|| SoftwareGroup {
+            id: proc.software.clone(),
+            name: proc.software.clone(),
+            kind: if is_gui_app(proc.exe.as_deref()) {
+                "app".into()
+            } else if proc.is_dev_service {
+                "service".into()
+            } else {
+                "process".into()
+            },
+            cpu: 0.0,
+            memory_bytes: 0,
+            process_count: 0,
+            pids: Vec::new(),
+            ports: Vec::new(),
+            can_stop: true,
+        });
+        entry.cpu += proc.cpu;
+        entry.memory_bytes = entry.memory_bytes.saturating_add(proc.memory_bytes);
+        entry.process_count += 1;
+        entry.pids.push(proc.pid);
+        for port in &proc.ports {
+            if !entry.ports.contains(port) {
+                entry.ports.push(*port);
+            }
+        }
+        if !can_stop_name(&proc.name) || !can_stop_name(&proc.software) {
+            entry.can_stop = false;
+        }
+        if is_gui_app(proc.exe.as_deref()) {
+            entry.kind = "app".into();
+        }
+    }
+    let mut groups: Vec<SoftwareGroup> = map.into_values().collect();
+    groups.sort_by(|a, b| {
+        b.cpu
+            .partial_cmp(&a.cpu)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(b.memory_bytes.cmp(&a.memory_bytes))
+    });
+    groups
+}
+
+pub fn gui_apps(groups: &[SoftwareGroup]) -> Vec<SoftwareGroup> {
+    groups
+        .iter()
+        .filter(|group| group.kind == "app")
+        .cloned()
+        .collect()
+}
+
+pub fn localhost_apps(ports: &[PortInfo], processes: &[DevProcess]) -> Vec<LocalhostApp> {
+    let by_pid: HashMap<u32, &DevProcess> = processes.iter().map(|p| (p.pid, p)).collect();
+    let mut apps = Vec::new();
+    let mut seen = HashSet::new();
+    for port in ports {
+        if !is_local_bind(&port.address) {
+            continue;
+        }
+        let key = (port.pid, port.port);
+        if !seen.insert(key) {
+            continue;
+        }
+        let proc = by_pid.get(&port.pid);
+        let can_stop = proc
+            .map(|p| can_stop_name(&p.name) && can_stop_name(&p.software))
+            .unwrap_or(true);
+        apps.push(LocalhostApp {
+            pid: port.pid,
+            name: port.display_name.clone(),
+            software: proc
+                .map(|p| p.software.clone())
+                .unwrap_or_else(|| port.process_name.clone()),
+            port: port.port,
+            address: port.address.clone(),
+            cpu: port.cpu,
+            memory_bytes: port.memory_bytes,
+            cwd: port.cwd.clone(),
+            can_stop,
+        });
+    }
+    apps.sort_by(|a, b| a.port.cmp(&b.port));
+    apps
+}
+
+fn is_local_bind(address: &str) -> bool {
+    matches!(
+        address,
+        "127.0.0.1" | "localhost" | "::1" | "[::1]" | "*" | "0.0.0.0" | "::"
+    ) || address.starts_with("127.")
 }

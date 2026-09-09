@@ -1,7 +1,9 @@
 import { create } from "zustand";
+import { ingestNotices } from "@/lib/notices";
 import { api } from "@/services/tauri";
 import type {
   AiService,
+  AppNotice,
   AppSettings,
   DockerOverview,
   HistoryPoint,
@@ -10,6 +12,7 @@ import type {
   PortInfo,
   DevProcess,
   Project,
+  SystemHealth,
 } from "@/types";
 
 interface AppStore {
@@ -25,6 +28,11 @@ interface AppStore {
   aiServices: AiService[];
   settings: AppSettings | null;
   history: HistoryPoint[];
+  notices: AppNotice[];
+  unreadNotices: number;
+  markNoticesRead: () => void;
+  dismissNotice: (id: string) => void;
+  clearNotices: () => void;
   loading: boolean;
   error: string | null;
   assistantOpen: boolean;
@@ -49,6 +57,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
   aiServices: [],
   settings: null,
   history: [],
+  notices: [],
+  unreadNotices: 0,
+  markNoticesRead: () => set({ unreadNotices: 0 }),
+  dismissNotice: (id) =>
+    set((state) => ({ notices: state.notices.filter((notice) => notice.id !== id) })),
+  clearNotices: () => set({ notices: [], unreadNotices: 0 }),
   loading: true,
   error: null,
   assistantOpen: false,
@@ -56,7 +70,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   refreshLive: async () => {
     try {
-      const snapshot = await api.live(get().page !== "processes");
+      const snapshot = normalizeSnapshot(await api.live(get().page !== "processes"));
       const memoryPct =
         snapshot.system.memoryTotal > 0
           ? (snapshot.system.memoryUsed / snapshot.system.memoryTotal) * 100
@@ -65,12 +79,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
         snapshot.system.swapTotal > 0
           ? (snapshot.system.swapUsed / snapshot.system.swapTotal) * 100
           : 0;
+      const incoming = ingestNotices(get().overview, snapshot);
       set((state) => ({
         overview: snapshot,
         ports: snapshot.ports,
         processes: snapshot.processes,
         loading: false,
         error: null,
+        notices: incoming.length ? [...incoming, ...state.notices].slice(0, 40) : state.notices,
+        unreadNotices: state.unreadNotices + incoming.length,
         history: [
           ...state.history.slice(-39),
           {
@@ -128,3 +145,39 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
   },
 }));
+
+function fallbackHealth(snapshot: LiveSnapshot): SystemHealth {
+  const memoryPct =
+    snapshot.system.memoryTotal > 0
+      ? (snapshot.system.memoryUsed / snapshot.system.memoryTotal) * 100
+      : 0;
+  const diskPct =
+    snapshot.system.diskTotal > 0
+      ? (snapshot.system.diskUsed / snapshot.system.diskTotal) * 100
+      : 0;
+  return {
+    score: 100,
+    status: "healthy",
+    temperatureC: snapshot.system.temperatureC ?? null,
+    cpuSpeedLimit: null,
+    cpuPct: snapshot.system.cpuUsage,
+    memoryPct,
+    diskPct,
+    loadRatio: snapshot.system.cpuCores ? snapshot.system.loadAvg1 / snapshot.system.cpuCores : 0,
+    alerts: [],
+  };
+}
+
+function normalizeSnapshot(snapshot: LiveSnapshot): LiveSnapshot {
+  return {
+    ...snapshot,
+    softwareGroups: snapshot.softwareGroups ?? [],
+    guiApps: snapshot.guiApps ?? [],
+    localhostApps: snapshot.localhostApps ?? [],
+    health: snapshot.health ?? fallbackHealth(snapshot),
+    processes: (snapshot.processes ?? []).map((proc) => ({
+      ...proc,
+      software: proc.software || proc.displayName || proc.name,
+    })),
+  };
+}

@@ -6,11 +6,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { usePolling } from "@/hooks/usePolling";
 import { useAppStore } from "@/store/appStore";
 import { DashboardPage } from "@/pages/DashboardPage";
+import { AppsPage } from "@/pages/AppsPage";
 import { PortsPage } from "@/pages/PortsPage";
 import { ProcessesPage } from "@/pages/ProcessesPage";
 import { ProjectsPage } from "@/pages/ProjectsPage";
 import { DockerPage } from "@/pages/DockerPage";
 import { AiModelsPage } from "@/pages/AiModelsPage";
+import { CachePage } from "@/pages/CachePage";
 import { SettingsPage } from "@/pages/SettingsPage";
 
 export function AppShell() {
@@ -47,11 +49,13 @@ export function AppShell() {
         <ScrollArea className="flex-1">
           <main className="p-6">
             {page === "dashboard" && <DashboardPage />}
+            {page === "apps" && <AppsPage />}
             {page === "ports" && <PortsPage />}
             {page === "processes" && <ProcessesPage />}
             {page === "projects" && <ProjectsPage />}
             {page === "docker" && <DockerPage />}
             {page === "ai" && <AiModelsPage />}
+            {page === "cache" && <CachePage />}
             {page === "settings" && <SettingsPage />}
           </main>
         </ScrollArea>

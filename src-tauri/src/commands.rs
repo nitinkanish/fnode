@@ -5,12 +5,13 @@ use tauri::State;
 
 use crate::ai_detector;
 use crate::assistant;
+use crate::cache;
 use crate::control;
 use crate::db;
 use crate::docker;
 use crate::models::{
-    AppSettings, AssistantReply, DevProcess, DockerOverview, LiveSnapshot, LogResult, PortInfo,
-    Project, SettingsUpdate, SystemSnapshot,
+    AppSettings, AssistantReply, CacheClearResult, CacheEntry, CacheGuide, DevProcess,
+    DockerOverview, LiveSnapshot, LogResult, PortInfo, Project, SettingsUpdate, SystemSnapshot,
 };
 use crate::project_detector;
 use crate::state::{self, AppState};
@@ -173,6 +174,42 @@ pub fn ai_open_chat(provider: String, endpoint: Option<String>) -> Result<(), St
 pub fn kill_process(state: State<AppState>, pid: u32, force: bool) -> Result<(), String> {
     let sys = state.lock_sys();
     control::kill_pid(Some(&sys), pid, force)
+}
+
+#[tauri::command]
+pub fn kill_processes(state: State<AppState>, pids: Vec<u32>) -> Result<u32, String> {
+    if pids.len() > 40 {
+        return Err("Too many processes in one stop request.".into());
+    }
+    let sys = state.lock_sys();
+    let mut stopped = 0u32;
+    let mut last_err = None;
+    for pid in pids {
+        match control::kill_pid(Some(&sys), pid, false) {
+            Ok(()) => stopped += 1,
+            Err(error) => last_err = Some(error),
+        }
+    }
+    if stopped == 0 {
+        Err(last_err.unwrap_or_else(|| "Nothing was stopped.".into()))
+    } else {
+        Ok(stopped)
+    }
+}
+
+#[tauri::command]
+pub fn get_cache_guide() -> Result<CacheGuide, String> {
+    Ok(cache::guide())
+}
+
+#[tauri::command]
+pub fn inspect_caches(app: tauri::AppHandle) -> Result<Vec<CacheEntry>, String> {
+    Ok(cache::inspect(&app))
+}
+
+#[tauri::command]
+pub fn clear_cache(app: tauri::AppHandle, id: String) -> Result<CacheClearResult, String> {
+    cache::clear(&app, &id)
 }
 
 #[tauri::command]

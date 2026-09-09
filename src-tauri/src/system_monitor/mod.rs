@@ -63,6 +63,7 @@ pub fn snapshot(sys: &System, networks: &Networks, previous: Option<NetSample>) 
         network_tx_bytes: tx,
         network_rx_per_sec: rx_rate,
         network_tx_per_sec: tx_rate,
+        temperature_c: None,
     };
 
     (snap, NetSample { at: now, rx, tx })

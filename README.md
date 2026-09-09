@@ -22,6 +22,16 @@
 
 FNode is a native desktop app (Tauri + Rust + React) that watches **CPU, memory, disks, ports, processes, project folders, Docker, and local AI runtimes** on this Mac. Nothing is uploaded unless you turn on the optional OpenAI assistant.
 
+## Download
+
+**[Download FNode for macOS (Apple Silicon)](https://github.com/nitinkanish/fnode/raw/main/public/FNode.dmg)**
+
+The installer is `public/FNode.dmg` in this repo (v0.1.0, Apple Silicon). macOS 12 or later.
+
+After opening the disk image, drag **FNode** into Applications. The first launch of an unsigned build: right-click the app → **Open**.
+
+Intel Macs: build from source with `pnpm tauri build` on that machine.
+
 ---
 
 ## Why FNode
@@ -75,7 +85,7 @@ Optional: Docker Desktop, Ollama / LM Studio, Cursor.
 ### Run from source
 
 ```bash
-git clone https://github.com/<your-github-username>/fnode.git
+git clone https://github.com/nitinkanish/fnode.git
 cd fnode
 pnpm install
 pnpm tauri dev
@@ -89,7 +99,7 @@ Vite serves the UI at `http://localhost:1420`. Tauri opens the native window.
 pnpm tauri build
 ```
 
-The `.app` bundle is written to `src-tauri/target/release/bundle/macos/`.
+The `.app` bundle is written to `src-tauri/target/release/bundle/macos/`. The `.dmg` is written to `src-tauri/target/release/bundle/dmg/` — copy it to `public/FNode.dmg` when you want the README download link to match a new release.
 
 ## Architecture
 

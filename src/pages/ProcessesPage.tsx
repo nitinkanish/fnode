@@ -28,7 +28,7 @@ export function ProcessesPage() {
     return processes
       .filter((proc) => (devOnly ? proc.isDevService : true))
       .filter((proc) =>
-        `${proc.displayName} ${proc.name} ${proc.command} ${proc.cwd ?? ""} ${proc.framework ?? ""}`
+        `${proc.displayName} ${proc.name} ${proc.software} ${proc.command} ${proc.cwd ?? ""} ${proc.framework ?? ""}`
           .toLowerCase()
           .includes(q),
       );
@@ -46,6 +46,7 @@ export function ProcessesPage() {
             <thead className="bg-secondary/50 text-xs text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">Service</th>
+                <th className="px-3 py-2 font-medium">Software</th>
                 <th className="px-3 py-2 font-medium">Runtime</th>
                 <th className="px-3 py-2 font-medium">CPU</th>
                 <th className="px-3 py-2 font-medium">Memory</th>
@@ -59,11 +60,14 @@ export function ProcessesPage() {
                   onClick={() => setSelected(proc)}
                   className="cursor-pointer border-t border-border/70 hover:bg-secondary/40"
                 >
-                  <td className="px-3 py-2">
-                    <div className="font-medium">{proc.displayName}</div>
-                    <div className="font-mono text-[11px] text-muted-foreground">PID {proc.pid}</div>
-                  </td>
-                  <td className="px-3 py-2">
+                    <td className="px-3 py-2">
+                      <div className="font-medium">{proc.displayName}</div>
+                      <div className="font-mono text-[11px] text-muted-foreground">PID {proc.pid}</div>
+                    </td>
+                    <td className="px-3 py-2">
+                      <Badge variant="secondary">{proc.software}</Badge>
+                    </td>
+                    <td className="px-3 py-2">
                     <Badge variant="secondary">{proc.framework ?? proc.runtime ?? proc.name}</Badge>
                   </td>
                   <td className="px-3 py-2">{formatPercent(proc.cpu)}</td>
@@ -83,6 +87,7 @@ export function ProcessesPage() {
           {selected ? (
             <div className="space-y-3">
               <h2 className="text-lg font-semibold">{selected.displayName}</h2>
+              <Meta label="Software" value={selected.software} />
               <Meta label="Framework" value={selected.framework ?? "—"} />
               <Meta label="Runtime" value={selected.runtime ?? selected.name} />
               <Meta label="Status" value={selected.status} />
