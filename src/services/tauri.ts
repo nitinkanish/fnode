@@ -30,7 +30,16 @@ export const api = {
     invoke<void>("ai_open_chat", { provider, endpoint }),
   killProcess: (pid: number, force = false) =>
     invoke<void>("kill_process", { pid, force }),
-  killProcesses: (pids: number[]) => invoke<number>("kill_processes", { pids }),
+  killProcesses: (pids: number[], force = false) =>
+    invoke<number>("kill_processes", { pids, force }),
+  quitCompletely: async (pids: number[]) => {
+    const unique = [...new Set(pids.filter((pid) => pid > 1))];
+    if (unique.length === 0) return 0;
+    const first = await invoke<number>("kill_processes", { pids: unique, force: false });
+    await new Promise((resolve) => window.setTimeout(resolve, 450));
+    await invoke<number>("kill_processes", { pids: unique, force: true }).catch(() => 0);
+    return first;
+  },
   inspectCaches: () => invoke<CacheEntry[]>("inspect_caches"),
   cacheGuide: () => invoke<CacheGuide>("get_cache_guide"),
   clearCache: (id: string) => invoke<CacheClearResult>("clear_cache", { id }),

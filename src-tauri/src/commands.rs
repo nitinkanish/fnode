@@ -177,20 +177,24 @@ pub fn kill_process(state: State<AppState>, pid: u32, force: bool) -> Result<(),
 }
 
 #[tauri::command]
-pub fn kill_processes(state: State<AppState>, pids: Vec<u32>) -> Result<u32, String> {
-    if pids.len() > 40 {
+pub fn kill_processes(state: State<AppState>, pids: Vec<u32>, force: Option<bool>) -> Result<u32, String> {
+    if pids.len() > 400 {
         return Err("Too many processes in one stop request.".into());
     }
+    let force = force.unwrap_or(false);
     let sys = state.lock_sys();
     let mut stopped = 0u32;
     let mut last_err = None;
     for pid in pids {
-        match control::kill_pid(Some(&sys), pid, false) {
+        match control::kill_pid(Some(&sys), pid, force) {
             Ok(()) => stopped += 1,
             Err(error) => last_err = Some(error),
         }
     }
     if stopped == 0 {
+        if force {
+            return Ok(0);
+        }
         Err(last_err.unwrap_or_else(|| "Nothing was stopped.".into()))
     } else {
         Ok(stopped)

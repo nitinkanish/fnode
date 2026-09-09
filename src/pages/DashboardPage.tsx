@@ -1,32 +1,13 @@
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { AppWindow, Box, Cpu, FolderGit2, HardDrive, HeartPulse, Radio, Sparkles, Wifi } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  chartTooltip,
-  formatBytes,
-  formatPercent,
-  formatRate,
-  formatUptime,
-  localhostUrl,
-} from "@/lib/format";
+import { AppIcon } from "@/components/shared/AppIcon";
+import { CoreBars, NativeAreaChart, UsageBar } from "@/components/charts/NativeCharts";
+import { formatBytes, formatPercent, formatRate, formatUptime, localhostUrl } from "@/lib/format";
 import { api } from "@/services/tauri";
 import { useAppStore } from "@/store/appStore";
-
-const CORE_COLORS = ["#f38064", "#818cf8", "#38bdf8", "#34d399", "#fbbf24", "#f472b6"];
 
 function HealthStat({ label, value }: { label: string; value: string }) {
   return (
@@ -55,16 +36,9 @@ export function DashboardPage() {
   const memPct = system.memoryTotal ? (system.memoryUsed / system.memoryTotal) * 100 : 0;
   const diskPct = system.diskTotal ? (system.diskUsed / system.diskTotal) * 100 : 0;
   const swapPct = system.swapTotal ? (system.swapUsed / system.swapTotal) * 100 : 0;
-  const cores = system.cpuPerCore.map((cpu, index) => ({
-    name: `${index}`,
-    cpu: Number(cpu.toFixed(1)),
-  }));
   const health = overview.health;
   const groups = overview.softwareGroups ?? [];
-  const hottest = groups.slice(0, 8).map((group) => ({
-    name: group.name.length > 18 ? `${group.name.slice(0, 18)}…` : group.name,
-    cpu: Number(group.cpu.toFixed(1)),
-  }));
+  const hottest = groups.slice(0, 8);
 
   return (
     <div className="space-y-6">
@@ -181,22 +155,20 @@ export function DashboardPage() {
         <Card className="xl:col-span-2">
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle>CPU, memory, swap</CardTitle>
-            <div className="flex gap-3 text-[11px] text-muted-foreground">
-              <span className="text-primary">CPU</span>
-              <span className="text-sky-400">RAM</span>
-              <span className="text-amber-300">Swap</span>
-            </div>
+            <p className="text-[11px] text-muted-foreground">Last {history.length} snapshots</p>
           </CardHeader>
           <CardContent className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={history}>
-                <CartesianGrid stroke="oklch(1 0 0 / 0.06)" vertical={false} />
-                <Tooltip contentStyle={chartTooltip} formatter={(value, name) => [`${Number(value).toFixed(1)}%`, String(name)]} />
-                <Area type="monotone" dataKey="cpu" name="CPU" stroke="#f38064" fill="#f38064" fillOpacity={0.18} />
-                <Area type="monotone" dataKey="memory" name="RAM" stroke="#38bdf8" fill="#38bdf8" fillOpacity={0.1} />
-                <Area type="monotone" dataKey="swap" name="Swap" stroke="#fbbf24" fill="#fbbf24" fillOpacity={0.08} />
-              </AreaChart>
-            </ResponsiveContainer>
+            <NativeAreaChart
+              data={history}
+              max={100}
+              height={220}
+              formatTip={(key, value) => `${key === "cpu" ? "CPU" : key === "memory" ? "RAM" : "Swap"} ${value.toFixed(0)}%`}
+              series={[
+                { key: "cpu", label: "CPU", color: "#f38064" },
+                { key: "memory", label: "RAM", color: "#38bdf8" },
+                { key: "swap", label: "Swap", color: "#fbbf24" },
+              ]}
+            />
           </CardContent>
         </Card>
         <Card>
@@ -217,16 +189,15 @@ export function DashboardPage() {
               </div>
             </div>
             <div className="h-36">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={history}>
-                  <Tooltip
-                    contentStyle={chartTooltip}
-                    formatter={(value, name) => [formatRate(Number(value)), String(name)]}
-                  />
-                  <Area type="monotone" dataKey="rx" name="Down" stroke="#34d399" fill="#34d399" fillOpacity={0.15} />
-                  <Area type="monotone" dataKey="tx" name="Up" stroke="#818cf8" fill="#818cf8" fillOpacity={0.12} />
-                </AreaChart>
-              </ResponsiveContainer>
+              <NativeAreaChart
+                data={history}
+                height={140}
+                formatTip={(key, value) => `${key === "rx" ? "Down" : "Up"} ${formatRate(value)}`}
+                series={[
+                  { key: "rx", label: "Down", color: "#34d399" },
+                  { key: "tx", label: "Up", color: "#818cf8" },
+                ]}
+              />
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground">
               Total {formatBytes(system.networkRxBytes)} in · {formatBytes(system.networkTxBytes)} out
@@ -241,19 +212,7 @@ export function DashboardPage() {
             <CardTitle>Per-core CPU</CardTitle>
           </CardHeader>
           <CardContent className="h-52">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={cores}>
-                <CartesianGrid stroke="oklch(1 0 0 / 0.06)" vertical={false} />
-                <XAxis dataKey="name" tick={{ fill: "#a1a1aa", fontSize: 10 }} />
-                <YAxis hide domain={[0, 100]} />
-                <Tooltip contentStyle={chartTooltip} formatter={(value) => [`${value}%`, "CPU"]} />
-                <Bar dataKey="cpu" radius={[4, 4, 0, 0]}>
-                  {cores.map((_, index) => (
-                    <Cell key={index} fill={CORE_COLORS[index % CORE_COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <CoreBars values={system.cpuPerCore.map((cpu) => Number(cpu.toFixed(1)))} />
           </CardContent>
         </Card>
         <Card>
@@ -263,18 +222,19 @@ export function DashboardPage() {
               Apps
             </Button>
           </CardHeader>
-          <CardContent className="h-52">
+          <CardContent className="space-y-3">
             {hottest.length === 0 ? (
               <p className="text-xs text-muted-foreground">No process groups yet.</p>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={hottest} layout="vertical" margin={{ left: 16 }}>
-                  <XAxis type="number" hide />
-                  <YAxis type="category" dataKey="name" width={110} tick={{ fill: "#a1a1aa", fontSize: 11 }} />
-                  <Tooltip contentStyle={chartTooltip} formatter={(value) => [`${value}%`, "CPU"]} />
-                  <Bar dataKey="cpu" fill="#f38064" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              hottest.map((group) => (
+                <UsageBar
+                  key={group.id}
+                  value={Math.min(100, group.cpu)}
+                  label={group.name}
+                  detail={`${formatPercent(group.cpu)} · ${formatBytes(group.memoryBytes)}`}
+                  icon={<AppIcon src={group.icon} name={group.name} size="sm" />}
+                />
+              ))
             )}
           </CardContent>
         </Card>
@@ -291,15 +251,14 @@ export function DashboardPage() {
           <CardContent className="space-y-2">
             {groups.slice(0, 8).map((group) => (
               <div key={group.id} className="flex items-center gap-3">
-                <div className="w-40 shrink-0 truncate text-sm">{group.name}</div>
+                <AppIcon src={group.icon} name={group.name} size="sm" />
+                <div className="w-36 shrink-0 truncate text-sm">{group.name}</div>
                 <div className="min-w-0 flex-1">
                   <Progress value={Math.min(100, group.cpu)} />
                 </div>
                 <div className="w-16 text-right text-xs tabular-nums">{formatPercent(group.cpu)}</div>
                 <div className="w-20 text-right text-xs text-muted-foreground">{formatBytes(group.memoryBytes)}</div>
-                <div className="w-16 text-right text-[11px] text-muted-foreground">
-                  {group.processCount} proc
-                </div>
+                <div className="w-16 text-right text-[11px] text-muted-foreground">{group.processCount} proc</div>
               </div>
             ))}
           </CardContent>

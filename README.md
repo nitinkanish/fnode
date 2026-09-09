@@ -15,7 +15,7 @@
 <p align="center">
   <a href="https://github.com/nitinkanish/fnode/raw/main/public/FNode.dmg"><img src="https://img.shields.io/badge/Download-macOS%20DMG-f38064?style=flat-square" alt="Download DMG" /></a>
   <img src="https://img.shields.io/badge/macOS-12%2B-111827?style=flat-square" alt="macOS 12+" />
-  <img src="https://img.shields.io/badge/Apple%20Silicon-0.2.0-111827?style=flat-square" alt="v0.2.0" />
+  <img src="https://img.shields.io/badge/Apple%20Silicon-0.3.0-111827?style=flat-square" alt="v0.3.0" />
   <img src="https://img.shields.io/badge/Tauri-2-24C8D8?style=flat-square" alt="Tauri 2" />
   <img src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square" alt="MIT License" />
 </p>
@@ -24,19 +24,18 @@ FNode is a native desktop app (Tauri + Rust + React) that watches **CPU, memory,
 
 ## Download
 
-**[Download FNode 0.2.0 for macOS (Apple Silicon)](https://github.com/nitinkanish/fnode/raw/main/public/FNode.dmg)**
+**[Download FNode 0.3.0 for macOS (Apple Silicon)](https://github.com/nitinkanish/fnode/raw/main/public/FNode.dmg)**
 
-The installer lives in this repo at [`public/FNode.dmg`](public/FNode.dmg). macOS 12 or later.
+The installer lives in this repo at [`public/FNode.dmg`](public/FNode.dmg). macOS 12 or later. This is an **ad-hoc signed local build** — any Apple Silicon Mac can run it after the first-launch bypass below. It is not Apple-notarized.
 
 1. Open the disk image.
 2. Drag **FNode** into Applications.
-3. If macOS shows **“Apple could not verify FNode.dmg is free of malware”**, the file was downloaded without Apple notarization. That dialog is Gatekeeper, not a broken installer:
+3. First launch: **right-click FNode → Open → Open**. If macOS still blocks a browser download:
    - Open **System Settings → Privacy & Security**
-   - Scroll to the FNode message and choose **Open Anyway**
-   - Confirm **Open**
-4. Prefer **build from source** (`pnpm tauri dev` / `pnpm tauri build`) if you want to skip the download warning on this Mac.
+   - Choose **Open Anyway**, then confirm **Open**
+   - Or Terminal: `xattr -cr /Applications/FNode.app && open /Applications/FNode.app`
 
-A Gatekeeper-clean download (no warning) requires a **Developer ID Application** certificate and Apple notarization. `Apple Development` signatures are for local debug only — browsers add a quarantine flag, and recent macOS will refuse to open that DMG until you use Open Anyway. See **Notarized release** below.
+A Gatekeeper-clean download (no warning) needs a **Developer ID Application** certificate and Apple notarization. See **Notarized release** below.
 
 Intel Macs: build from source with `pnpm tauri build` on that machine.
 
@@ -124,9 +123,13 @@ Vite serves the UI at `http://localhost:1420`. Tauri opens the native window.
 pnpm tauri build
 ```
 
-The `.app` is written to `src-tauri/target/release/bundle/macos/` and the installer to `src-tauri/target/release/bundle/dmg/`. Copy the DMG to `public/FNode.dmg` so the download link above matches the release.
+The `.app` is written to `src-tauri/target/release/bundle/macos/`. For a shareable local DMG (ad-hoc signed, any Apple Silicon Mac):
 
-That local build still uses an **Apple Development** identity unless a Developer ID is in the keychain. Downloading that DMG from GitHub will trigger Gatekeeper.
+```bash
+pnpm run build:macos:local
+```
+
+That writes [`public/FNode.dmg`](public/FNode.dmg) plus a `How to open.txt` on the disk image. Recipients drag FNode to Applications, then right-click → Open.
 
 ### Notarized release (no Gatekeeper warning)
 

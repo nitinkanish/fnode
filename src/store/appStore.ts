@@ -174,9 +174,22 @@ function fallbackHealth(snapshot: LiveSnapshot): SystemHealth {
 function normalizeSnapshot(snapshot: LiveSnapshot): LiveSnapshot {
   return {
     ...snapshot,
-    softwareGroups: snapshot.softwareGroups ?? [],
-    guiApps: snapshot.guiApps ?? [],
-    localhostApps: snapshot.localhostApps ?? [],
+    softwareGroups: (snapshot.softwareGroups ?? []).map((app) => ({
+      ...app,
+      bundlePath: app.bundlePath ?? null,
+      startedAt: app.startedAt ?? 0,
+      helpers: app.helpers ?? [],
+    })),
+    guiApps: (snapshot.guiApps ?? []).map((app) => ({
+      ...app,
+      bundlePath: app.bundlePath ?? null,
+      startedAt: app.startedAt ?? 0,
+      helpers: app.helpers ?? [],
+    })),
+    localhostApps: (snapshot.localhostApps ?? []).map((app) => ({
+      ...app,
+      startedAt: app.startedAt ?? 0,
+    })),
     health: snapshot.health ?? fallbackHealth(snapshot),
     processes: (snapshot.processes ?? []).map((proc) => ({
       ...proc,

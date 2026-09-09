@@ -8,7 +8,7 @@ import { useAppStore } from "@/store/appStore";
 
 const titles: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: "System overview", subtitle: "Live machine health and running services" },
-  apps: { title: "Applications", subtitle: "Running GUI apps and localhost services you can stop" },
+  apps: { title: "Applications", subtitle: "Running Mac apps and local servers — inspect, open, or quit" },
   ports: { title: "Port monitor", subtitle: "Listening TCP services on this Mac" },
   processes: { title: "All processes", subtitle: "Every process on this Mac, with app icon, runtime, and framework" },
   projects: { title: "Projects", subtitle: "Discovered from your usual code folders" },

@@ -118,6 +118,9 @@ export interface SoftwareGroup {
   icon: string | null;
   frameworks: string[];
   runtimes: string[];
+  bundlePath: string | null;
+  startedAt: number;
+  helpers: string[];
 }
 
 export interface LocalhostApp {
@@ -134,6 +137,7 @@ export interface LocalhostApp {
   runtime: string | null;
   icon: string | null;
   project: string | null;
+  startedAt: number;
 }
 
 export interface HealthAlert {
@@ -310,6 +314,7 @@ export interface HistoryPoint {
   load: number;
   rx: number;
   tx: number;
+  [key: string]: number;
 }
 
 export type PageId =

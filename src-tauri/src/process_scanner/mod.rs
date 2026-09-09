@@ -81,11 +81,7 @@ pub fn classify_process(process: &Process, listening_ports: &[u16]) -> DevProces
         exe: exe.clone(),
         status: format!("{:?}", process.status()),
         software,
-        icon: if exe.as_deref().is_some_and(|path| path.contains(".app/")) {
-            crate::app_icon::for_exe(exe.as_deref())
-        } else {
-            None
-        },
+        icon: crate::app_icon::for_exe(exe.as_deref()),
     }
 }
 
@@ -393,15 +389,11 @@ pub fn software_name(exe: Option<&str>, name: &str, display: &str) -> String {
 }
 
 fn app_bundle_name(exe: &str) -> Option<String> {
-    let path = Path::new(exe);
-    for ancestor in path.ancestors() {
-        if ancestor.extension().and_then(|ext| ext.to_str()) == Some("app") {
-            return ancestor
-                .file_stem()
-                .map(|stem| stem.to_string_lossy().into_owned());
-        }
-    }
-    None
+    crate::app_icon::bundle_path(exe).and_then(|bundle| {
+        bundle
+            .file_stem()
+            .map(|stem| stem.to_string_lossy().into_owned())
+    })
 }
 
 pub fn is_gui_app(exe: Option<&str>) -> bool {
@@ -436,6 +428,9 @@ pub fn group_software(processes: &[DevProcess]) -> Vec<SoftwareGroup> {
             icon: crate::app_icon::for_exe(proc.exe.as_deref()),
             frameworks: Vec::new(),
             runtimes: Vec::new(),
+            bundle_path: bundle_path_from_exe(proc.exe.as_deref()),
+            started_at: proc.started_at,
+            helpers: Vec::new(),
         });
         entry.cpu += proc.cpu;
         entry.memory_bytes = entry.memory_bytes.saturating_add(proc.memory_bytes);
@@ -443,6 +438,11 @@ pub fn group_software(processes: &[DevProcess]) -> Vec<SoftwareGroup> {
         entry.pids.push(proc.pid);
         if entry.icon.is_none() {
             entry.icon = proc.icon.clone();
+        }
+        if entry.icon.is_none() {
+            if let Some(path) = &entry.bundle_path {
+                entry.icon = crate::app_icon::for_bundle(Path::new(path));
+            }
         }
         if let Some(framework) = &proc.framework {
             if !entry.frameworks.iter().any(|item| item == framework) {
@@ -465,6 +465,18 @@ pub fn group_software(processes: &[DevProcess]) -> Vec<SoftwareGroup> {
         if is_gui_app(proc.exe.as_deref()) {
             entry.kind = "app".into();
         }
+        if entry.bundle_path.is_none() {
+            entry.bundle_path = bundle_path_from_exe(proc.exe.as_deref());
+        }
+        if proc.started_at > 0 && (entry.started_at == 0 || proc.started_at < entry.started_at) {
+            entry.started_at = proc.started_at;
+        }
+        let helper = helper_label(&proc.name, &entry.name);
+        if let Some(helper) = helper {
+            if !entry.helpers.iter().any(|item| item == &helper) {
+                entry.helpers.push(helper);
+            }
+        }
     }
     let mut groups: Vec<SoftwareGroup> = map.into_values().collect();
     groups.sort_by(|a, b| {
@@ -479,9 +491,13 @@ pub fn group_software(processes: &[DevProcess]) -> Vec<SoftwareGroup> {
 pub fn gui_apps(groups: &[SoftwareGroup]) -> Vec<SoftwareGroup> {
     groups
         .iter()
-        .filter(|group| group.kind == "app")
+        .filter(|group| group.kind == "app" && is_user_facing_bundle(group.bundle_path.as_deref()))
         .cloned()
         .collect()
+}
+
+fn is_user_facing_bundle(path: Option<&str>) -> bool {
+    crate::app_icon::is_user_facing(Path::new(path.unwrap_or("")))
 }
 
 pub fn localhost_apps(ports: &[PortInfo], processes: &[DevProcess]) -> Vec<LocalhostApp> {
@@ -516,10 +532,33 @@ pub fn localhost_apps(ports: &[PortInfo], processes: &[DevProcess]) -> Vec<Local
             runtime: proc.and_then(|p| p.runtime.clone()),
             icon: proc.and_then(|p| p.icon.clone()),
             project: proc.and_then(|p| p.cwd.as_deref().map(title_from_path)),
+            started_at: proc.map(|p| p.started_at).unwrap_or(0),
         });
     }
     apps.sort_by(|a, b| a.port.cmp(&b.port));
     apps
+}
+
+fn bundle_path_from_exe(exe: Option<&str>) -> Option<String> {
+    crate::app_icon::bundle_path(exe?).map(|path| path.to_string_lossy().into_owned())
+}
+
+fn helper_label(process_name: &str, software: &str) -> Option<String> {
+    let trimmed = process_name.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case(software) {
+        return None;
+    }
+    let mut stripped = trimmed
+        .strip_prefix(software)
+        .unwrap_or(trimmed)
+        .trim();
+    stripped = stripped.strip_prefix("Helper").unwrap_or(stripped).trim();
+    stripped = stripped.trim_matches(|c: char| matches!(c, ' ' | '-' | '_' | '(' | ')'));
+    if stripped.is_empty() || stripped.eq_ignore_ascii_case(software) {
+        Some("Helper".into())
+    } else {
+        Some(stripped.to_string())
+    }
 }
 
 fn is_local_bind(address: &str) -> bool {

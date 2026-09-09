@@ -147,6 +147,9 @@ pub struct SoftwareGroup {
     pub icon: Option<String>,
     pub frameworks: Vec<String>,
     pub runtimes: Vec<String>,
+    pub bundle_path: Option<String>,
+    pub started_at: u64,
+    pub helpers: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -165,6 +168,7 @@ pub struct LocalhostApp {
     pub runtime: Option<String>,
     pub icon: Option<String>,
     pub project: Option<String>,
+    pub started_at: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

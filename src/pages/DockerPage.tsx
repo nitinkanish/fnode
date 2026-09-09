@@ -1,12 +1,14 @@
 import { useMemo, useState } from "react";
-import { RotateCcw, Square, Terminal, Play } from "lucide-react";
+import { Copy, ExternalLink, FolderOpen, Play, RotateCcw, Square, Terminal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { LogViewer } from "@/components/shared/LogViewer";
-import { formatBytes } from "@/lib/format";
+import { compactGrid } from "@/components/shared/UsageRow";
+import { formatBytes, formatStartedAt, localhostUrl } from "@/lib/format";
 import { api } from "@/services/tauri";
 import { useAppStore } from "@/store/appStore";
 import type { DockerContainer, LogResult } from "@/types";
@@ -17,12 +19,30 @@ export function DockerPage() {
   const refreshDocker = useAppStore((s) => s.refreshDocker);
   const [confirm, setConfirm] = useState<DockerContainer | null>(null);
   const [logs, setLogs] = useState<LogResult | null>(null);
+  const [logFollow, setLogFollow] = useState<{ containerId: string } | null>(null);
 
   const containers = useMemo(() => {
     const q = query.toLowerCase();
     return (docker?.containers ?? []).filter((item) =>
-      `${item.name} ${item.image} ${item.status}`.toLowerCase().includes(q),
+      `${item.name} ${item.image} ${item.status} ${item.ports.join(" ")}`.toLowerCase().includes(q),
     );
+  }, [docker, query]);
+
+  const images = useMemo(() => {
+    const q = query.toLowerCase();
+    return (docker?.images ?? []).filter((item) => `${item.tags.join(" ")} ${item.id}`.toLowerCase().includes(q));
+  }, [docker, query]);
+
+  const volumes = useMemo(() => {
+    const q = query.toLowerCase();
+    return (docker?.volumes ?? []).filter((item) =>
+      `${item.name} ${item.driver} ${item.mountpoint}`.toLowerCase().includes(q),
+    );
+  }, [docker, query]);
+
+  const networks = useMemo(() => {
+    const q = query.toLowerCase();
+    return (docker?.networks ?? []).filter((item) => `${item.name} ${item.driver}`.toLowerCase().includes(q));
   }, [docker, query]);
 
   if (docker && !docker.available) {
@@ -34,93 +54,220 @@ export function DockerPage() {
     );
   }
 
+  const running = containers.filter((item) => item.state.toLowerCase() === "running").length;
+
   return (
     <Tabs defaultValue="containers">
-      <TabsList>
-        <TabsTrigger value="containers">Containers</TabsTrigger>
-        <TabsTrigger value="images">Images</TabsTrigger>
-        <TabsTrigger value="volumes">Volumes</TabsTrigger>
-        <TabsTrigger value="networks">Networks</TabsTrigger>
-      </TabsList>
-      <TabsContent value="containers">
-        <div className="overflow-hidden rounded-xl border border-border">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-secondary/50 text-xs text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 font-medium">Container</th>
-                <th className="px-3 py-2 font-medium">Image</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Ports</th>
-                <th className="px-3 py-2 font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {containers.map((container) => {
-                const running = container.state.toLowerCase() === "running";
-                return (
-                  <tr key={container.id} className="border-t border-border/70">
-                    <td className="px-3 py-2 font-medium">{container.name}</td>
-                    <td className="px-3 py-2 font-mono text-xs">{container.image}</td>
-                    <td className="px-3 py-2">
-                      <Badge variant={running ? "success" : "secondary"}>{container.status || container.state}</Badge>
-                    </td>
-                    <td className="px-3 py-2 font-mono text-xs">{container.ports.join(", ") || "—"}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex flex-wrap gap-1.5">
-                        {running ? (
-                          <Button size="sm" variant="outline" onClick={() => setConfirm(container)}>
-                            <Square className="h-3.5 w-3.5" /> Stop
-                          </Button>
-                        ) : (
-                          <Button size="sm" variant="outline" onClick={() => void api.dockerStart(container.id).then(refreshDocker)}>
-                            <Play className="h-3.5 w-3.5" /> Start
-                          </Button>
-                        )}
-                        <Button size="sm" variant="outline" onClick={() => void api.dockerRestart(container.id).then(refreshDocker)}>
-                          <RotateCcw className="h-3.5 w-3.5" /> Restart
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={async () => setLogs(await api.dockerLogs(container.id))}>
-                          Logs
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => void api.dockerShell(container.name)}>
-                          <Terminal className="h-3.5 w-3.5" /> Shell
-                        </Button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <TabsList>
+          <TabsTrigger value="containers">Containers ({containers.length})</TabsTrigger>
+          <TabsTrigger value="images">Images ({images.length})</TabsTrigger>
+          <TabsTrigger value="volumes">Volumes ({volumes.length})</TabsTrigger>
+          <TabsTrigger value="networks">Networks ({networks.length})</TabsTrigger>
+        </TabsList>
+        <p className="text-[11px] text-muted-foreground">{running} running</p>
+      </div>
+
+      <TabsContent value="containers" className="mt-3">
+        {containers.length === 0 ? (
+          <EmptyState title="No containers" description="None match the current filter." />
+        ) : (
+          <div className={compactGrid}>
+            {containers.map((container) => {
+              const isRunning = container.state.toLowerCase() === "running";
+              return (
+                <Card key={container.id}>
+                  <CardContent className="space-y-2 p-3">
+                    <div className="flex items-start gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium leading-tight">{container.name}</div>
+                        <p className="truncate font-mono text-[11px] text-muted-foreground" title={container.image}>
+                          {container.image}
+                          {container.created ? ` · ${formatStartedAt(container.created)}` : ""}
+                        </p>
                       </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {containers.length === 0 && (
-            <div className="p-4">
-              <EmptyState title="No containers" description="None match the current filter." />
-            </div>
-          )}
-        </div>
+                      <Badge variant={isRunning ? "success" : "secondary"} className="shrink-0 px-1 py-0 text-[10px]">
+                        {container.state}
+                      </Badge>
+                    </div>
+                    {container.ports.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {container.ports.slice(0, 6).map((port) => {
+                          const host = publishedPort(port);
+                          if (host) {
+                            return (
+                              <button
+                                key={port}
+                                type="button"
+                                title={port}
+                                className="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 font-mono text-[11px] text-primary hover:bg-secondary"
+                                onClick={() => void api.openUrl(localhostUrl(host))}
+                              >
+                                {port}
+                                <ExternalLink className="h-3 w-3" />
+                              </button>
+                            );
+                          }
+                          return (
+                            <Badge key={port} variant="outline" className="px-1 py-0 font-mono text-[10px]">
+                              {port}
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-1">
+                      {isRunning ? (
+                        <Button size="sm" variant="destructive" className="h-7 px-2" onClick={() => setConfirm(container)}>
+                          <Square className="h-3 w-3" />
+                          Stop
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={() => void api.dockerStart(container.id).then(refreshDocker)}
+                        >
+                          <Play className="h-3 w-3" />
+                          Start
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2"
+                        onClick={() => void api.dockerRestart(container.id).then(refreshDocker)}
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                        Restart
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2"
+                        onClick={async () => {
+                          setLogFollow({ containerId: container.id });
+                          setLogs(await api.dockerLogs(container.id));
+                        }}
+                      >
+                        Logs
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2"
+                        onClick={() => void api.dockerShell(container.name)}
+                      >
+                        <Terminal className="h-3 w-3" />
+                        Shell
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </TabsContent>
-      <TabsContent value="images">
-        <SimpleTable
-          rows={(docker?.images ?? []).map((image) => [
-            image.tags.join(", ") || image.id.slice(0, 12),
-            formatBytes(image.size),
-            image.id.slice(7, 19),
-          ])}
-          headers={["Tags", "Size", "ID"]}
-        />
+
+      <TabsContent value="images" className="mt-3">
+        {images.length === 0 ? (
+          <EmptyState title="No images" description="None match the current filter." />
+        ) : (
+          <div className={compactGrid}>
+            {images.map((image) => (
+              <Card key={image.id}>
+                <CardContent className="space-y-2 p-3">
+                  <div className="truncate text-sm font-medium leading-tight">
+                    {image.tags.join(", ") || image.id.slice(0, 12)}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {formatBytes(image.size)}
+                    {image.created ? ` · ${formatStartedAt(image.created)}` : ""}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2"
+                    onClick={() => void navigator.clipboard.writeText(image.id)}
+                  >
+                    <Copy className="h-3 w-3" />
+                    Copy ID
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </TabsContent>
-      <TabsContent value="volumes">
-        <SimpleTable
-          rows={(docker?.volumes ?? []).map((volume) => [volume.name, volume.driver, volume.mountpoint])}
-          headers={["Name", "Driver", "Mount"]}
-        />
+
+      <TabsContent value="volumes" className="mt-3">
+        {volumes.length === 0 ? (
+          <EmptyState title="No volumes" description="None match the current filter." />
+        ) : (
+          <div className={compactGrid}>
+            {volumes.map((volume) => (
+              <Card key={volume.name}>
+                <CardContent className="space-y-2 p-3">
+                  <div className="truncate text-sm font-medium leading-tight">{volume.name}</div>
+                  <p className="truncate font-mono text-[11px] text-muted-foreground" title={volume.mountpoint}>
+                    {volume.driver} · {volume.mountpoint}
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-2"
+                      onClick={() => void api.openFolder(volume.mountpoint)}
+                    >
+                      <FolderOpen className="h-3 w-3" />
+                      Folder
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-2"
+                      onClick={() => void navigator.clipboard.writeText(volume.mountpoint)}
+                    >
+                      <Copy className="h-3 w-3" />
+                      Copy
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </TabsContent>
-      <TabsContent value="networks">
-        <SimpleTable
-          rows={(docker?.networks ?? []).map((network) => [network.name, network.driver, network.id.slice(0, 12)])}
-          headers={["Name", "Driver", "ID"]}
-        />
+
+      <TabsContent value="networks" className="mt-3">
+        {networks.length === 0 ? (
+          <EmptyState title="No networks" description="None match the current filter." />
+        ) : (
+          <div className={compactGrid}>
+            {networks.map((network) => (
+              <Card key={network.id}>
+                <CardContent className="space-y-2 p-3">
+                  <div className="truncate text-sm font-medium leading-tight">{network.name}</div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {network.driver} · {network.id.slice(0, 12)}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2"
+                    onClick={() => void navigator.clipboard.writeText(network.id)}
+                  >
+                    <Copy className="h-3 w-3" />
+                    Copy ID
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </TabsContent>
+
       <ConfirmDialog
         open={Boolean(confirm)}
         onOpenChange={(open) => !open && setConfirm(null)}
@@ -132,32 +279,19 @@ export function DockerPage() {
           setConfirm(null);
         }}
       />
-      <LogViewer open={Boolean(logs)} onOpenChange={(open) => !open && setLogs(null)} logs={logs} />
+      <LogViewer
+        open={Boolean(logs)}
+        onOpenChange={(open) => !open && setLogs(null)}
+        logs={logs}
+        follow={logFollow ?? undefined}
+      />
     </Tabs>
   );
 }
 
-function SimpleTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
-  return (
-    <div className="overflow-hidden rounded-xl border border-border">
-      <table className="w-full text-left text-sm">
-        <thead className="bg-secondary/50 text-xs text-muted-foreground">
-          <tr>
-            {headers.map((header) => (
-              <th key={header} className="px-3 py-2 font-medium">{header}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => (
-            <tr key={index} className="border-t border-border/70">
-              {row.map((cell) => (
-                <td key={cell} className="px-3 py-2 font-mono text-xs">{cell}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+function publishedPort(spec: string): number | null {
+  if (!spec.includes("->")) return null;
+  const host = spec.split("->")[0];
+  const value = Number(host.split(":").pop());
+  return Number.isFinite(value) && value > 0 ? value : null;
 }

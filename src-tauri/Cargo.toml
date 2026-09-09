@@ -1,6 +1,6 @@
 [package]
 name = "fnode"
-version = "0.2.0"
+version = "0.3.0"
 description = "Your machine. Your node. One pulse."
 authors = ["Nitin Kanish"]
 license = "MIT"

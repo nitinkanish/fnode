@@ -9,14 +9,21 @@ export function AppIcon({
   name: string;
   size?: "sm" | "md" | "lg";
 }) {
-  const dim = size === "sm" ? "h-7 w-7 text-[10px]" : size === "lg" ? "h-11 w-11 text-sm" : "h-9 w-9 text-[11px]";
+  const dim = size === "sm" ? "h-7 w-7 text-[10px]" : size === "lg" ? "h-12 w-12 text-sm" : "h-9 w-9 text-[11px]";
   if (src) {
-    return <img src={src} alt="" className={cn("shrink-0 rounded-[9px] object-cover", dim)} />;
+    return (
+      <img
+        src={src}
+        alt=""
+        draggable={false}
+        className={cn("shrink-0 object-contain drop-shadow-sm", dim)}
+      />
+    );
   }
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-[9px] bg-primary/15 font-semibold text-primary",
+        "flex shrink-0 items-center justify-center rounded-[11px] bg-primary/15 font-semibold text-primary",
         dim,
       )}
     >
