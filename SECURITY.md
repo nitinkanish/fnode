@@ -19,7 +19,7 @@ FNode is a **local-first** macOS app. Scanning, process control, Docker, and SQL
 - Show environment variables that look like secrets
 - Upload telemetry
 
-Data lives at `~/Library/Application Support/com.fnode.app/` (`fnode.db` + captured restart logs).
+Data lives at `~/Library/Application Support/com.nitinkanish.fnode/` (`fnode.db` + captured restart logs). Older installs under `com.fnode.app` are copied on first launch.
 
 ## Reporting a vulnerability
 

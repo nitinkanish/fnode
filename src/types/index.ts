@@ -102,6 +102,7 @@ export interface DevProcess {
   exe: string | null;
   status: string;
   software: string;
+  icon: string | null;
 }
 
 export interface SoftwareGroup {
@@ -114,6 +115,9 @@ export interface SoftwareGroup {
   pids: number[];
   ports: number[];
   canStop: boolean;
+  icon: string | null;
+  frameworks: string[];
+  runtimes: string[];
 }
 
 export interface LocalhostApp {
@@ -126,6 +130,10 @@ export interface LocalhostApp {
   memoryBytes: number;
   cwd: string | null;
   canStop: boolean;
+  framework: string | null;
+  runtime: string | null;
+  icon: string | null;
+  project: string | null;
 }
 
 export interface HealthAlert {
@@ -257,6 +265,10 @@ export interface AiModel {
   name: string;
   size: string | null;
   parameterSize: string | null;
+  family: string | null;
+  quantization: string | null;
+  format: string | null;
+  loaded: boolean;
 }
 
 export interface AiService {
@@ -265,6 +277,8 @@ export interface AiService {
   endpoint: string | null;
   models: AiModel[];
   pid: number | null;
+  loadedCount: number;
+  version: string | null;
 }
 
 export interface LogResult {

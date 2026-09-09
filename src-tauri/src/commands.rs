@@ -379,7 +379,12 @@ pub fn get_settings(state: State<AppState>) -> Result<AppSettings, String> {
         .ok()
         .flatten()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(3000);
+        .unwrap_or(20_000);
+    let poll_interval_ms = if poll_interval_ms < 10_000 {
+        20_000
+    } else {
+        poll_interval_ms.min(120_000)
+    };
     let project_roots = db::get_setting(&db, "project_roots")
         .ok()
         .flatten()
@@ -419,6 +424,7 @@ pub fn save_settings(state: State<AppState>, update: SettingsUpdate) -> Result<A
             db::set_setting(&db, "openai_model", &model).map_err(|e| e.to_string())?;
         }
         if let Some(ms) = update.poll_interval_ms {
+            let ms = ms.clamp(10_000, 120_000);
             db::set_setting(&db, "poll_interval_ms", &ms.to_string()).map_err(|e| e.to_string())?;
         }
         if let Some(roots) = update.project_roots {

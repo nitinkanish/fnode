@@ -129,6 +129,7 @@ pub struct DevProcess {
     pub exe: Option<String>,
     pub status: String,
     pub software: String,
+    pub icon: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -143,6 +144,9 @@ pub struct SoftwareGroup {
     pub pids: Vec<u32>,
     pub ports: Vec<u16>,
     pub can_stop: bool,
+    pub icon: Option<String>,
+    pub frameworks: Vec<String>,
+    pub runtimes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -157,6 +161,10 @@ pub struct LocalhostApp {
     pub memory_bytes: u64,
     pub cwd: Option<String>,
     pub can_stop: bool,
+    pub framework: Option<String>,
+    pub runtime: Option<String>,
+    pub icon: Option<String>,
+    pub project: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -308,6 +316,10 @@ pub struct AiModel {
     pub name: String,
     pub size: Option<String>,
     pub parameter_size: Option<String>,
+    pub family: Option<String>,
+    pub quantization: Option<String>,
+    pub format: Option<String>,
+    pub loaded: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -318,6 +330,8 @@ pub struct AiService {
     pub endpoint: Option<String>,
     pub models: Vec<AiModel>,
     pub pid: Option<u32>,
+    pub loaded_count: usize,
+    pub version: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

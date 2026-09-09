@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "FNode",
-  "version": "0.1.0",
-  "identifier": "com.fnode.app",
+  "version": "0.2.0",
+  "identifier": "com.nitinkanish.fnode",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -29,21 +29,38 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost https://api.openai.com; img-src 'self' asset: http://asset.localhost blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:"
     }
   },
   "bundle": {
     "active": true,
     "targets": ["app", "dmg"],
+    "publisher": "Nitin Kanish",
+    "copyright": "Copyright © 2026 Nitin Kanish",
+    "category": "DeveloperTool",
+    "shortDescription": "Your machine. Your node. One pulse.",
+    "longDescription": "FNode is a local-first macOS command center for developers. It shows live CPU, memory, disk, ports, processes, projects, Docker, and local AI runtimes — then lets you stop services and clear user caches without leaving this Mac.",
+    "homepage": "https://github.com/nitinkanish/fnode",
+    "license": "MIT",
+    "licenseFile": "../LICENSE",
     "icon": [
       "icons/32x32.png",
+      "icons/64x64.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
     ],
     "macOS": {
-      "minimumSystemVersion": "12.0"
+      "minimumSystemVersion": "12.0",
+      "hardenedRuntime": true,
+      "signingIdentity": "-",
+      "entitlements": "./Entitlements.plist",
+      "dmg": {
+        "appPosition": { "x": 180, "y": 170 },
+        "applicationFolderPosition": { "x": 480, "y": 170 },
+        "windowSize": { "width": 660, "height": 400 }
+      }
     }
   }
 }

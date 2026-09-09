@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { AssistantPanel } from "@/components/assistant/AssistantPanel";
@@ -22,7 +22,7 @@ export function AppShell() {
   const refreshDocker = useAppStore((s) => s.refreshDocker);
   const refreshAi = useAppStore((s) => s.refreshAi);
   const loadSettings = useAppStore((s) => s.loadSettings);
-  const pollMs = useAppStore((s) => s.settings?.pollIntervalMs ?? 3000);
+  const pollMs = Math.max(useAppStore((s) => s.settings?.pollIntervalMs ?? 20_000), 10_000);
   const error = useAppStore((s) => s.error);
 
   const live = useCallback(() => refreshLive(), [refreshLive]);
@@ -34,7 +34,16 @@ export function AppShell() {
     void refreshAi();
     void loadSettings();
   }, [refreshProjects, refreshDocker, refreshAi, loadSettings]);
-  usePolling(slower, Math.max(pollMs * 4, 12000), true);
+  usePolling(slower, Math.max(pollMs * 3, 60_000), true);
+
+  useEffect(() => {
+    if (page === "processes" || page === "apps") {
+      void refreshLive();
+    }
+    if (page === "ai") {
+      void refreshAi();
+    }
+  }, [page, refreshLive, refreshAi]);
 
   return (
     <div className="flex h-full bg-background">

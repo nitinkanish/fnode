@@ -107,18 +107,23 @@ export function SettingsPage() {
           <CardTitle className="text-foreground">Live updates</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Label htmlFor="poll">Poll interval (ms)</Label>
+          <Label htmlFor="poll">Snapshot interval (ms)</Label>
           <Input
             id="poll"
             type="number"
-            min={1000}
+            min={10000}
+            max={120000}
+            step={1000}
             value={settings.pollIntervalMs}
             onChange={(event) =>
               useAppStore.setState({
-                settings: { ...settings, pollIntervalMs: Number(event.target.value) || 3000 },
+                settings: { ...settings, pollIntervalMs: Number(event.target.value) || 20000 },
               })
             }
           />
+          <p className="text-xs text-muted-foreground">
+            Default is 20 seconds. FNode does not hammer the OS. Logs you open still follow in near real time.
+          </p>
         </CardContent>
       </Card>
 

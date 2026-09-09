@@ -3,13 +3,14 @@ import { APP_NAME } from "@/brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NotificationBell } from "@/components/layout/NotificationBell";
+import { RefreshCountdown } from "@/components/layout/RefreshCountdown";
 import { useAppStore } from "@/store/appStore";
 
 const titles: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: "System overview", subtitle: "Live machine health and running services" },
   apps: { title: "Applications", subtitle: "Running GUI apps and localhost services you can stop" },
   ports: { title: "Port monitor", subtitle: "Listening TCP services on this Mac" },
-  processes: { title: "Process intelligence", subtitle: "Developer-friendly view of running work" },
+  processes: { title: "All processes", subtitle: "Every process on this Mac, with app icon, runtime, and framework" },
   projects: { title: "Projects", subtitle: "Discovered from your usual code folders" },
   docker: { title: "Docker", subtitle: "Containers, images, volumes, and networks" },
   ai: { title: "AI models", subtitle: "Local providers detected on this machine" },
@@ -40,6 +41,7 @@ export function TopBar() {
             className="pl-8"
           />
         </div>
+        <RefreshCountdown />
         <NotificationBell />
         <Button variant="outline" onClick={() => setAssistantOpen(true)}>
           <Sparkles className="h-4 w-4" />

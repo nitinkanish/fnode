@@ -1,7 +1,7 @@
 {
   "name": "fnode",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "MIT",
   "author": "Nitin Kanish",
   "description": "FNode — Your machine. Your node. One pulse. Local-first macOS development command center.",
@@ -10,7 +10,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "build:macos": "tauri build --bundles app,dmg"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.23",

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDisplayName</key>
+  <string>FNode</string>
+  <key>CFBundleName</key>
+  <string>FNode</string>
+  <key>CFBundleSpokenName</key>
+  <string>F Node</string>
+  <key>LSApplicationCategoryType</key>
+  <string>public.app-category.developer-tools</string>
+  <key>LSMinimumSystemVersion</key>
+  <string>12.0</string>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+  <key>NSSupportsAutomaticGraphicsSwitching</key>
+  <true/>
+  <key>NSHumanReadableCopyright</key>
+  <string>Copyright © 2026 Nitin Kanish. MIT License.</string>
+  <key>CFBundleGetInfoString</key>
+  <string>FNode 0.2.0 — Your machine. Your node. One pulse.</string>
+</dict>
+</plist>

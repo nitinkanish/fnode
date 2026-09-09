@@ -37,6 +37,7 @@ interface AppStore {
   error: string | null;
   assistantOpen: boolean;
   setAssistantOpen: (open: boolean) => void;
+  lastLiveAt: number | null;
   refreshLive: () => Promise<void>;
   refreshProjects: (scan?: boolean) => Promise<void>;
   refreshDocker: () => Promise<void>;
@@ -68,6 +69,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   assistantOpen: false,
   setAssistantOpen: (assistantOpen) => set({ assistantOpen }),
 
+  lastLiveAt: null,
   refreshLive: async () => {
     try {
       const snapshot = normalizeSnapshot(await api.live(get().page !== "processes"));
@@ -86,6 +88,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         processes: snapshot.processes,
         loading: false,
         error: null,
+        lastLiveAt: Date.now(),
         notices: incoming.length ? [...incoming, ...state.notices].slice(0, 40) : state.notices,
         unreadNotices: state.unreadNotices + incoming.length,
         history: [
@@ -178,6 +181,7 @@ function normalizeSnapshot(snapshot: LiveSnapshot): LiveSnapshot {
     processes: (snapshot.processes ?? []).map((proc) => ({
       ...proc,
       software: proc.software || proc.displayName || proc.name,
+      icon: proc.icon ?? null,
     })),
   };
 }

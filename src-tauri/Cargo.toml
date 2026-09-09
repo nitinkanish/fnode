@@ -1,9 +1,11 @@
 [package]
 name = "fnode"
-version = "0.1.0"
+version = "0.2.0"
 description = "Your machine. Your node. One pulse."
 authors = ["Nitin Kanish"]
 license = "MIT"
+homepage = "https://github.com/nitinkanish/fnode"
+repository = "https://github.com/nitinkanish/fnode"
 edition = "2021"
 
 [lib]

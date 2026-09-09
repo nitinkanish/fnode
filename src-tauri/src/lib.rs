@@ -1,4 +1,5 @@
 mod ai_detector;
+mod app_icon;
 mod assistant;
 mod cache;
 mod commands;
@@ -91,9 +92,18 @@ fn migrate_legacy_db(dest: &std::path::Path) {
     let Some(home) = dirs::home_dir() else {
         return;
     };
-    let old = home
-        .join("Library/Application Support/com.devpilot.app/devpilot.db");
-    if old.is_file() {
-        let _ = std::fs::copy(&old, dest);
+    let support = home.join("Library/Application Support");
+    let candidates = [
+        support.join("com.fnode.app/fnode.db"),
+        support.join("com.devpilot.app/devpilot.db"),
+    ];
+    for old in candidates {
+        if old.is_file() {
+            if let Some(parent) = dest.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let _ = std::fs::copy(&old, dest);
+            return;
+        }
     }
 }

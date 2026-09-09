@@ -74,6 +74,7 @@ pub fn enrich(sys: &System, raw: Vec<RawListen>) -> Vec<PortInfo> {
                     exe: None,
                     status: "unknown".into(),
                     software: row.command.clone(),
+                    icon: None,
                 }
             });
 

@@ -16,7 +16,7 @@ function omitInstallersFromDist() {
       const dist = path.resolve(root, "dist");
       if (!fs.existsSync(dist)) return;
       for (const name of fs.readdirSync(dist)) {
-        if (name.endsWith(".dmg") || name.endsWith(".app") || name.endsWith(".exe")) {
+        if (name.endsWith(".dmg") || name.endsWith(".app") || name.endsWith(".exe") || name === "screenshots") {
           fs.rmSync(path.join(dist, name), { recursive: true, force: true });
         }
       }

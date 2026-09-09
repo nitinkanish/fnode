@@ -32,11 +32,17 @@ export function AiModelsPage() {
               <CardTitle className="text-foreground">{service.provider}</CardTitle>
               <div className="mt-1 font-mono text-xs text-muted-foreground">
                 {service.endpoint ?? "No HTTP endpoint"}
+                {service.version ? ` · v${service.version}` : ""}
               </div>
             </div>
-            <Badge variant={service.running ? "success" : "secondary"}>
-              {service.running ? "Running" : "Stopped"}
-            </Badge>
+            <div className="flex flex-col items-end gap-1">
+              <Badge variant={service.running ? "success" : "secondary"}>
+                {service.running ? "Running" : "Stopped"}
+              </Badge>
+              {service.loadedCount > 0 && (
+                <Badge variant="warning">{service.loadedCount} loaded now</Badge>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             {service.models.length === 0 ? (
@@ -45,9 +51,14 @@ export function AiModelsPage() {
               <div className="space-y-2">
                 {service.models.map((model) => (
                   <div key={model.name} className="rounded-lg bg-secondary/60 px-3 py-2">
-                    <div className="text-sm font-medium">{model.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {[model.size, model.parameterSize].filter(Boolean).join(" · ") || "Local model"}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-sm font-medium">{model.name}</div>
+                      {model.loaded && <Badge variant="success">In memory</Badge>}
+                    </div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">
+                      {[model.family, model.parameterSize, model.quantization, model.format, model.size]
+                        .filter(Boolean)
+                        .join(" · ") || "Local model"}
                     </div>
                   </div>
                 ))}

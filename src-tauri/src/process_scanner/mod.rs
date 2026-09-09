@@ -78,9 +78,14 @@ pub fn classify_process(process: &Process, listening_ports: &[u16]) -> DevProces
         ports: listening_ports.to_vec(),
         is_dev_service,
         safe_env: safe_environment(process),
-        exe,
+        exe: exe.clone(),
         status: format!("{:?}", process.status()),
         software,
+        icon: if exe.as_deref().is_some_and(|path| path.contains(".app/")) {
+            crate::app_icon::for_exe(exe.as_deref())
+        } else {
+            None
+        },
     }
 }
 
@@ -148,7 +153,13 @@ fn detect_runtime(name: &str, command: &str) -> Option<String> {
     if hay.contains("node") || hay.contains("npm") || hay.contains("pnpm") || hay.contains("yarn") || hay.contains("npx") || hay.contains("bun") {
         return Some("Node.js".into());
     }
-    if hay.contains("python") || hay.contains("uvicorn") || hay.contains("gunicorn") || hay.contains("hypercorn") {
+    if hay.contains("php") {
+        return Some("PHP".into());
+    }
+    if hay.contains("ruby") || hay.contains("rails") || hay.contains("puma") {
+        return Some("Ruby".into());
+    }
+    if hay.contains("python") || hay.contains("uvicorn") || hay.contains("gunicorn") || hay.contains("hypercorn") || hay.contains("streamlit") {
         return Some("Python".into());
     }
     if hay.contains("java") || hay.contains("gradle") || hay.contains("mvn") {
@@ -168,14 +179,29 @@ fn detect_runtime(name: &str, command: &str) -> Option<String> {
 
 fn detect_framework(command: &str, cwd: Option<&str>) -> Option<String> {
     let lower = command.to_lowercase();
-    if lower.contains("next") || lower.contains("next-server") {
+    if lower.contains("next-server") || lower.contains("next dev") || lower.contains("next start") || command_has_bin(&lower, "next") {
         return Some("Next.js".into());
+    }
+    if lower.contains("nuxt") {
+        return Some("Nuxt".into());
+    }
+    if lower.contains("remix") {
+        return Some("Remix".into());
+    }
+    if lower.contains("svelte-kit") || lower.contains("sveltekit") {
+        return Some("SvelteKit".into());
+    }
+    if lower.contains("astro") {
+        return Some("Astro".into());
     }
     if lower.contains("vite") {
         return Some("Vite".into());
     }
     if lower.contains("nest") {
         return Some("NestJS".into());
+    }
+    if lower.contains("webpack") {
+        return Some("webpack".into());
     }
     if lower.contains("uvicorn") || lower.contains("fastapi") {
         return Some("FastAPI".into());
@@ -186,6 +212,18 @@ fn detect_framework(command: &str, cwd: Option<&str>) -> Option<String> {
     if lower.contains("flask") || lower.contains("werkzeug") {
         return Some("Flask".into());
     }
+    if lower.contains("streamlit") {
+        return Some("Streamlit".into());
+    }
+    if lower.contains("gradio") {
+        return Some("Gradio".into());
+    }
+    if lower.contains("jupyter") || lower.contains("ipython") {
+        return Some("Jupyter".into());
+    }
+    if lower.contains("rails") || lower.contains("puma") {
+        return Some("Rails".into());
+    }
     if lower.contains("angular") {
         return Some("Angular".into());
     }
@@ -195,9 +233,27 @@ fn detect_framework(command: &str, cwd: Option<&str>) -> Option<String> {
     None
 }
 
+fn command_has_bin(lower: &str, bin: &str) -> bool {
+    lower
+        .split(|c: char| c.is_whitespace() || c == '/' || c == '\\')
+        .any(|part| part == bin)
+}
+
 fn infer_framework_from_disk(cwd: &Path) -> Option<String> {
     let package = cwd.join("package.json");
     if let Ok(contents) = std::fs::read_to_string(package) {
+        if contents.contains("\"nuxt\"") {
+            return Some("Nuxt".into());
+        }
+        if contents.contains("\"@remix-run/node\"") || contents.contains("\"remix\"") {
+            return Some("Remix".into());
+        }
+        if contents.contains("\"@sveltejs/kit\"") {
+            return Some("SvelteKit".into());
+        }
+        if contents.contains("\"astro\"") {
+            return Some("Astro".into());
+        }
         if contents.contains("\"next\"") {
             return Some("Next.js".into());
         }
@@ -377,11 +433,27 @@ pub fn group_software(processes: &[DevProcess]) -> Vec<SoftwareGroup> {
             pids: Vec::new(),
             ports: Vec::new(),
             can_stop: true,
+            icon: crate::app_icon::for_exe(proc.exe.as_deref()),
+            frameworks: Vec::new(),
+            runtimes: Vec::new(),
         });
         entry.cpu += proc.cpu;
         entry.memory_bytes = entry.memory_bytes.saturating_add(proc.memory_bytes);
         entry.process_count += 1;
         entry.pids.push(proc.pid);
+        if entry.icon.is_none() {
+            entry.icon = proc.icon.clone();
+        }
+        if let Some(framework) = &proc.framework {
+            if !entry.frameworks.iter().any(|item| item == framework) {
+                entry.frameworks.push(framework.clone());
+            }
+        }
+        if let Some(runtime) = &proc.runtime {
+            if !entry.runtimes.iter().any(|item| item == runtime) {
+                entry.runtimes.push(runtime.clone());
+            }
+        }
         for port in &proc.ports {
             if !entry.ports.contains(port) {
                 entry.ports.push(*port);
@@ -440,6 +512,10 @@ pub fn localhost_apps(ports: &[PortInfo], processes: &[DevProcess]) -> Vec<Local
             memory_bytes: port.memory_bytes,
             cwd: port.cwd.clone(),
             can_stop,
+            framework: proc.and_then(|p| p.framework.clone()),
+            runtime: proc.and_then(|p| p.runtime.clone()),
+            icon: proc.and_then(|p| p.icon.clone()),
+            project: proc.and_then(|p| p.cwd.as_deref().map(title_from_path)),
         });
     }
     apps.sort_by(|a, b| a.port.cmp(&b.port));

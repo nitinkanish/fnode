@@ -83,12 +83,40 @@ pub async fn detect(hints: &[ProcessHint], listening_ports: &[u16]) -> Vec<AiSer
         }
 
         if matches!(probe.provider, "Ollama" | "LM Studio") || is_running {
+            let (loaded, version) = if probe.provider == "Ollama" && is_running {
+                ollama_runtime().await
+            } else {
+                (Vec::new(), None)
+            };
+            let mut models = models;
+            for model in &mut models {
+                model.loaded = loaded.iter().any(|name| name == &model.name || model.name.starts_with(name));
+            }
+            for name in &loaded {
+                if !models.iter().any(|model| &model.name == name) {
+                    models.insert(
+                        0,
+                        AiModel {
+                            name: name.clone(),
+                            size: None,
+                            parameter_size: None,
+                            family: None,
+                            quantization: None,
+                            format: None,
+                            loaded: true,
+                        },
+                    );
+                }
+            }
+            let loaded_count = models.iter().filter(|model| model.loaded).count();
             services.push(AiService {
                 provider: probe.provider.into(),
                 running: is_running,
                 endpoint: Some(format!("http://127.0.0.1:{}", probe.port)),
                 models,
                 pid,
+                loaded_count,
+                version,
             });
         }
     }
@@ -128,24 +156,7 @@ async fn fetch_models(probe: &Probe) -> (Vec<AiModel>, bool) {
     let models = if probe.provider == "Ollama" {
         json.get("models")
             .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|item| {
-                        let name = item.get("name")?.as_str()?.to_string();
-                        let size = item.get("size").and_then(|v| v.as_u64()).map(format_bytes);
-                        let parameter_size = item
-                            .get("details")
-                            .and_then(|d| d.get("parameter_size"))
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string());
-                        Some(AiModel {
-                            name,
-                            size,
-                            parameter_size,
-                        })
-                    })
-                    .collect()
-            })
+            .map(|arr| arr.iter().filter_map(|item| parse_ollama_model(item, false)).collect())
             .unwrap_or_default()
     } else {
         json.get("data")
@@ -156,7 +167,14 @@ async fn fetch_models(probe: &Probe) -> (Vec<AiModel>, bool) {
                         Some(AiModel {
                             name: item.get("id")?.as_str()?.to_string(),
                             size: None,
-                            parameter_size: None,
+                            parameter_size: item
+                                .get("owned_by")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string()),
+                            family: item.get("object").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                            quantization: None,
+                            format: Some("OpenAI-compatible".into()),
+                            loaded: true,
                         })
                     })
                     .collect()
@@ -165,6 +183,67 @@ async fn fetch_models(probe: &Probe) -> (Vec<AiModel>, bool) {
     };
 
     (models, true)
+}
+
+fn parse_ollama_model(item: &Value, loaded: bool) -> Option<AiModel> {
+    let name = item.get("name").or_else(|| item.get("model"))?.as_str()?.to_string();
+    let details = item.get("details");
+    Some(AiModel {
+        name,
+        size: item.get("size").and_then(|v| v.as_u64()).map(format_bytes),
+        parameter_size: details
+            .and_then(|d| d.get("parameter_size"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        family: details
+            .and_then(|d| d.get("family"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        quantization: details
+            .and_then(|d| d.get("quantization_level"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        format: details
+            .and_then(|d| d.get("format"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        loaded,
+    })
+}
+
+async fn ollama_runtime() -> (Vec<String>, Option<String>) {
+    let client = match reqwest::Client::builder().timeout(HTTP_TIMEOUT).build() {
+        Ok(c) => c,
+        Err(_) => return (Vec::new(), None),
+    };
+    let version = match client.get("http://127.0.0.1:11434/api/version").send().await {
+        Ok(res) => res
+            .json::<Value>()
+            .await
+            .ok()
+            .and_then(|json| json.get("version")?.as_str().map(|s| s.to_string())),
+        Err(_) => None,
+    };
+    let loaded = match client.get("http://127.0.0.1:11434/api/ps").send().await {
+        Ok(res) => res
+            .json::<Value>()
+            .await
+            .ok()
+            .and_then(|json| json.get("models")?.as_array().cloned())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|item| {
+                        item.get("name")
+                            .or_else(|| item.get("model"))
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string())
+                    })
+                    .collect()
+            })
+            .unwrap_or_default(),
+        Err(_) => Vec::new(),
+    };
+    (loaded, version)
 }
 
 fn find_pid(hints: &[ProcessHint], provider: &str) -> Option<u32> {
@@ -195,6 +274,8 @@ fn detect_named(hints: &[ProcessHint], provider: &str, needles: &[&str]) -> Opti
                 endpoint: None,
                 models: vec![],
                 pid: Some(proc.pid),
+                loaded_count: 0,
+                version: None,
             });
         }
     }
