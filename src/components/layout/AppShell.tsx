@@ -5,6 +5,7 @@ import { AssistantPanel } from "@/components/assistant/AssistantPanel";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { usePolling } from "@/hooks/usePolling";
 import { useNativeMenu } from "@/hooks/useNativeMenu";
+import { armSplash, dismissSplash } from "@/lib/splash";
 import { useAppStore } from "@/store/appStore";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { AppsPage } from "@/pages/AppsPage";
@@ -28,7 +29,23 @@ export function AppShell() {
   const loadMetrics = useAppStore((s) => s.loadMetrics);
   const pollMs = Math.max(useAppStore((s) => s.settings?.pollIntervalMs ?? 20_000), 10_000);
   const error = useAppStore((s) => s.error);
+  const loading = useAppStore((s) => s.loading);
+  const overview = useAppStore((s) => s.overview);
   useNativeMenu();
+
+  useEffect(() => {
+    armSplash();
+  }, []);
+
+  useEffect(() => {
+    if (loading && !overview && !error) return;
+    dismissSplash();
+  }, [loading, overview, error]);
+
+  useEffect(() => {
+    const id = window.setTimeout(dismissSplash, 10_000);
+    return () => window.clearTimeout(id);
+  }, []);
 
   const live = useCallback(() => refreshLive(), [refreshLive]);
   usePolling(live, pollMs, true);
