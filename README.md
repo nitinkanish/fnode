@@ -84,13 +84,14 @@ Most activity monitors show everything. FNode is built for **how developers actu
 
 | Area | What you get |
 | --- | --- |
-| Dashboard | Health score, CPU, RAM, swap, disk, temperature, load 1/5/15, per-core bars, network, hottest software |
+| Dashboard | Health score, CPU, RAM, swap, disk, temperature, load, per-core bars, network, hottest software, **camera/mic**, **battery**, **7/30-day history** |
 | Apps | Running `.app` bundles with icons · localhost servers with framework/runtime · Quit / Stop |
 | Ports | `lsof` TCP `LISTEN` table with process, project path, and localhost open |
 | Processes | All processes · macOS icons · Next.js / Python / FastAPI / Vite and other stacks · stop / restart |
 | Projects | Framework + language detection, git branch, folder details, open in Cursor |
 | Docker | Engine API over the local UNIX socket |
 | AI models | Ollama / LM Studio detection, loaded models, family / size / quantization |
+| Homebrew | `brew outdated --json=v2` · one-click `brew upgrade` with a confirmed, allowlisted name |
 | Cache | Scan and empty known caches under `$HOME` with a live syscall log |
 | Assistant | Snapshot Q&A with no cloud unless you opt in |
 
@@ -133,23 +134,26 @@ That writes [`public/FNode.dmg`](public/FNode.dmg) plus a `How to open.txt` on t
 
 ### Notarized release (no Gatekeeper warning)
 
-Needs team **YLKU69SJ9T** (DEBUGGED PRO PRIVATE LIMITED):
+A GitHub/browser download is blocked until Apple notarizes a **Developer ID Application** signature. `Apple Development` and ad-hoc (`signingIdentity: "-"`) cannot be notarized.
 
-1. Account Holder or Admin creates a **Developer ID Application** certificate and installs it on the build Mac
-2. App Store Connect API key, or Apple ID + [app-specific password](https://appleid.apple.com)
-3. Run:
+**If you are not on the signing team:** you cannot produce a Gatekeeper-clean DMG. Ship `pnpm run build:macos:local` (ad-hoc) and tell recipients to right-click → Open, or build from source. Do not commit secrets or `.p8` keys.
+
+**If you hold Developer ID for team YLKU69SJ9T (DEBUGGED PRO PRIVATE LIMITED):**
+
+1. Account Holder or Admin creates **Developer ID Application** at [Certificates](https://developer.apple.com/account/resources/certificates/add) and installs the `.cer` + private key on the build Mac
+2. App Store Connect → Users and Access → Integrations → **Team API key** (Issuer ID + Key ID + `AuthKey_KEYID.p8`), or an Apple ID [app-specific password](https://appleid.apple.com)
+3. From a clean tree:
 
 ```bash
 export APPLE_SIGNING_IDENTITY="Developer ID Application: DEBUGGED PRO PRIVATE LIMITED (YLKU69SJ9T)"
 export APPLE_TEAM_ID=YLKU69SJ9T
-# API key (preferred)
 export APPLE_API_KEY=KEY_ID
 export APPLE_API_ISSUER=ISSUER_UUID
 export APPLE_API_KEY_PATH=/path/to/AuthKey_KEY_ID.p8
 pnpm run build:macos:notarized
 ```
 
-The script signs, notarizes, staples, and writes `public/FNode.dmg`. Apple Development certificates cannot be notarized.
+`scripts/build-macos-release.sh` signs, waits for notary, staples, and copies `public/FNode.dmg`. Confirm with `xcrun stapler validate public/FNode.dmg` and `spctl --assess --type open -vv public/FNode.dmg`.
 
 ## Architecture
 

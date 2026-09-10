@@ -3,6 +3,7 @@ import { APP_NAME } from "@/brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NotificationBell } from "@/components/layout/NotificationBell";
+import { PrivacyBadge } from "@/components/layout/PrivacyBadge";
 import { RefreshCountdown } from "@/components/layout/RefreshCountdown";
 import { useAppStore } from "@/store/appStore";
 
@@ -15,6 +16,7 @@ const titles: Record<string, { title: string; subtitle: string }> = {
   docker: { title: "Docker", subtitle: "Containers, images, volumes, and networks" },
   ai: { title: "AI models", subtitle: "Local providers detected on this machine" },
   cache: { title: "Cache cleaner", subtitle: "What FNode deletes, and live OS calls as it happens" },
+  brew: { title: "Homebrew", subtitle: "Outdated formulae and casks — upgrade with a confirmed brew command" },
   settings: { title: "Settings", subtitle: "App folders, privacy, scanning, and optional OpenAI" },
 };
 
@@ -42,6 +44,7 @@ export function TopBar() {
           />
         </div>
         <RefreshCountdown />
+        <PrivacyBadge />
         <NotificationBell />
         <Button variant="outline" onClick={() => setAssistantOpen(true)}>
           <Sparkles className="h-4 w-4" />

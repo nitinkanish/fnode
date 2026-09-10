@@ -74,10 +74,70 @@ export interface LiveSnapshot {
   guiApps: SoftwareGroup[];
   localhostApps: LocalhostApp[];
   health: SystemHealth;
+  privacy: PrivacyStatus;
+  battery: BatteryStatus;
   paths: AppPaths;
 }
 
 export type DashboardOverview = LiveSnapshot;
+
+export interface PrivacyApp {
+  pid: number;
+  name: string;
+  software: string;
+  icon: string | null;
+}
+
+export interface PrivacyStatus {
+  cameraActive: boolean;
+  microphoneActive: boolean;
+  cameraApps: PrivacyApp[];
+  microphoneApps: PrivacyApp[];
+}
+
+export interface BatteryDrainer {
+  name: string;
+  cpu: number;
+  memoryBytes: number;
+  icon: string | null;
+}
+
+export interface BatteryStatus {
+  present: boolean;
+  percent: number | null;
+  cycleCount: number | null;
+  designCapacity: number | null;
+  maxCapacity: number | null;
+  maxCapacityPct: number | null;
+  condition: string;
+  charging: boolean;
+  drainers: BatteryDrainer[];
+}
+
+export interface MetricsPoint {
+  ts: number;
+  cpu: number;
+  memory: number;
+  swap: number;
+  disk: number;
+  rx: number;
+  tx: number;
+}
+
+export interface BrewPackage {
+  name: string;
+  current: string;
+  latest: string;
+  pinned: boolean;
+  cask: boolean;
+}
+
+export interface BrewOutdated {
+  available: boolean;
+  error: string | null;
+  formulae: BrewPackage[];
+  casks: BrewPackage[];
+}
 
 export interface EnvVar {
   key: string;
@@ -303,6 +363,7 @@ export interface AppSettings {
   pollIntervalMs: number;
   projectRoots: string[];
   hasOpenaiKey: boolean;
+  privacySensorsEnabled: boolean;
   paths: AppPaths;
 }
 
@@ -314,7 +375,8 @@ export interface HistoryPoint {
   load: number;
   rx: number;
   tx: number;
-  [key: string]: number;
+  disk?: number;
+  [key: string]: number | undefined;
 }
 
 export type PageId =
@@ -326,4 +388,5 @@ export type PageId =
   | "docker"
   | "ai"
   | "cache"
+  | "brew"
   | "settings";

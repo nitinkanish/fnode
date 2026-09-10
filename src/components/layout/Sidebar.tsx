@@ -4,6 +4,7 @@ import {
   Box,
   FolderGit2,
   LayoutDashboard,
+  Package,
   Radio,
   Settings,
   Sparkles,
@@ -22,6 +23,7 @@ const items: { id: PageId; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "projects", label: "Projects", icon: FolderGit2 },
   { id: "docker", label: "Docker", icon: Box },
   { id: "ai", label: "AI Models", icon: Sparkles },
+  { id: "brew", label: "Homebrew", icon: Package },
   { id: "cache", label: "Cache", icon: Trash2 },
   { id: "settings", label: "Settings", icon: Settings },
 ];

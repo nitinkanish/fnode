@@ -37,6 +37,7 @@ export function SettingsPage() {
         .map((line) => line.trim())
         .filter(Boolean),
       openaiApiKey: apiKey.length > 0 ? apiKey : undefined,
+      privacySensorsEnabled: current.privacySensorsEnabled,
     });
     setApiKey("");
     setSaved(true);
@@ -96,9 +97,24 @@ export function SettingsPage() {
         <CardHeader>
           <CardTitle className="text-foreground">Privacy</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>Scanning, process control, Docker, and SQLite all stay on this Mac. Nothing is uploaded unless you opt into OpenAI below.</p>
-          <p>Sensitive environment variables are never sent to the UI. Killing a process always asks for confirmation.</p>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Scanning, process control, Docker, and SQLite all stay on this Mac. Nothing is uploaded unless you opt into OpenAI below.
+          </p>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium">Camera & microphone watch</div>
+              <p className="text-xs text-muted-foreground">
+                Local `lsof` against running apps. FNode never opens the camera or mic. Off skips that extra scan.
+              </p>
+            </div>
+            <Switch
+              checked={settings.privacySensorsEnabled}
+              onCheckedChange={(privacySensorsEnabled) =>
+                useAppStore.setState({ settings: { ...settings, privacySensorsEnabled } })
+              }
+            />
+          </div>
         </CardContent>
       </Card>
 

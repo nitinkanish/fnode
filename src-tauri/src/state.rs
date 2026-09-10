@@ -6,13 +6,16 @@ use std::time::Instant;
 use rusqlite::Connection;
 use sysinfo::{Networks, ProcessesToUpdate, System};
 
+use crate::battery;
 use crate::db;
 use crate::health;
 use crate::models::{AppPaths, ChartProc, DevProcess, LiveSnapshot};
 use crate::paths;
 use crate::port_scanner;
+use crate::privacy;
 use crate::process_scanner;
 use crate::system_monitor::{self, NetSample, DB_WRITE_TTL, LIVE_TTL};
+use crate::tray;
 
 struct LiveCache {
     at: Option<Instant>,
@@ -180,6 +183,15 @@ impl AppState {
         let mut system = system;
         system.temperature_c = health.temperature_c;
 
+        let privacy_enabled = db::get_setting(&self.lock_db(), "privacy_sensors_enabled")
+            .ok()
+            .flatten()
+            .map(|v| v != "false")
+            .unwrap_or(true);
+        let privacy = privacy::scan(&processes, privacy_enabled);
+        tray::apply_current(&privacy);
+        let battery = battery::snapshot(&software_groups);
+
         LiveSnapshot {
             system,
             open_ports: ports.len(),
@@ -197,6 +209,8 @@ impl AppState {
             gui_apps,
             localhost_apps,
             health,
+            privacy,
+            battery,
             paths: self.app_paths(),
         }
     }
@@ -230,6 +244,32 @@ impl AppState {
             })
             .collect();
         let _ = db::snapshot_processes(&db, &rows);
+        let mem = if snapshot.system.memory_total == 0 {
+            0.0
+        } else {
+            (snapshot.system.memory_used as f32 / snapshot.system.memory_total as f32) * 100.0
+        };
+        let swap = if snapshot.system.swap_total == 0 {
+            0.0
+        } else {
+            (snapshot.system.swap_used as f32 / snapshot.system.swap_total as f32) * 100.0
+        };
+        let disk = if snapshot.system.disk_total == 0 {
+            0.0
+        } else {
+            (snapshot.system.disk_used as f32 / snapshot.system.disk_total as f32) * 100.0
+        };
+        let ts = chrono::Utc::now().timestamp();
+        let _ = db::insert_metrics(
+            &db,
+            ts,
+            snapshot.system.cpu_usage,
+            mem,
+            swap,
+            disk,
+            snapshot.system.network_rx_per_sec,
+            snapshot.system.network_tx_per_sec,
+        );
     }
 }
 

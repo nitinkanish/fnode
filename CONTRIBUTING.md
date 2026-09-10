@@ -44,6 +44,24 @@ The Vite dev server listens on port **1420**. The native window hot-reloads the 
 3. Note how you tested (`pnpm tauri dev`, which pages, any `cargo test`)
 4. Do not commit `node_modules`, `src-tauri/target`, `.env`, or personal SQLite files
 
+## Releases and notarization
+
+Contributors **without** a Developer ID certificate should use:
+
+```bash
+pnpm run build:macos:local
+```
+
+That ad-hoc DMG runs on any Apple Silicon Mac after right-click → Open. It will still show Apple’s malware dialog after a browser download.
+
+A silent Gatekeeper install requires:
+
+1. **Developer ID Application** (not Apple Development) for the team that owns `com.nitinkanish.fnode`
+2. App Store Connect API key **or** Apple ID + app-specific password
+3. `pnpm run build:macos:notarized` (see README → Notarized release)
+
+Never put `AuthKey_*.p8`, `APPLE_PASSWORD`, or signing identities in the repo or in GitHub Actions logs.
+
 ## License
 
 By contributing you agree that your work is licensed under the MIT License in this repository.

@@ -69,7 +69,92 @@ pub struct LiveSnapshot {
     pub gui_apps: Vec<SoftwareGroup>,
     pub localhost_apps: Vec<LocalhostApp>,
     pub health: SystemHealth,
+    pub privacy: PrivacyStatus,
+    pub battery: BatteryStatus,
     pub paths: AppPaths,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrivacyApp {
+    pub pid: u32,
+    pub name: String,
+    pub software: String,
+    pub icon: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrivacyStatus {
+    pub camera_active: bool,
+    pub microphone_active: bool,
+    pub camera_apps: Vec<PrivacyApp>,
+    pub microphone_apps: Vec<PrivacyApp>,
+}
+
+impl PrivacyStatus {
+    pub fn idle() -> Self {
+        Self {
+            camera_active: false,
+            microphone_active: false,
+            camera_apps: Vec::new(),
+            microphone_apps: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatteryDrainer {
+    pub name: String,
+    pub cpu: f32,
+    pub memory_bytes: u64,
+    pub icon: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatteryStatus {
+    pub present: bool,
+    pub percent: Option<f32>,
+    pub cycle_count: Option<u32>,
+    pub design_capacity: Option<u32>,
+    pub max_capacity: Option<u32>,
+    pub max_capacity_pct: Option<f32>,
+    pub condition: String,
+    pub charging: bool,
+    pub drainers: Vec<BatteryDrainer>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetricsPoint {
+    pub ts: i64,
+    pub cpu: f32,
+    pub memory: f32,
+    pub swap: f32,
+    pub disk: f32,
+    pub rx: f64,
+    pub tx: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrewPackage {
+    pub name: String,
+    pub current: String,
+    pub latest: String,
+    pub pinned: bool,
+    pub cask: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrewOutdated {
+    pub available: bool,
+    pub error: Option<String>,
+    pub formulae: Vec<BrewPackage>,
+    pub casks: Vec<BrewPackage>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -362,6 +447,7 @@ pub struct AppSettings {
     pub poll_interval_ms: u64,
     pub project_roots: Vec<String>,
     pub has_openai_key: bool,
+    pub privacy_sensors_enabled: bool,
     pub paths: AppPaths,
 }
 
@@ -374,4 +460,5 @@ pub struct SettingsUpdate {
     pub project_roots: Option<Vec<String>>,
     /// If Some, replace the stored key. Empty string clears it. Never echoed back.
     pub openai_api_key: Option<String>,
+    pub privacy_sensors_enabled: Option<bool>,
 }

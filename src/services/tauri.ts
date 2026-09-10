@@ -3,12 +3,14 @@ import type {
   AiService,
   AppSettings,
   AssistantReply,
+  BrewOutdated,
   CacheClearResult,
   CacheEntry,
   CacheGuide,
   DockerOverview,
   LiveSnapshot,
   LogResult,
+  MetricsPoint,
   Project,
 } from "@/types";
 
@@ -54,4 +56,8 @@ export const api = {
   settings: () => invoke<AppSettings>("get_settings"),
   saveSettings: (update: Record<string, unknown>) =>
     invoke<AppSettings>("save_settings", { update }),
+  metricsHistory: (range: "7d" | "30d") =>
+    invoke<MetricsPoint[]>("get_metrics_history", { range }),
+  brewOutdated: (force = false) => invoke<BrewOutdated>("get_brew_outdated", { force }),
+  brewUpgrade: (name: string) => invoke<string>("brew_upgrade", { name }),
 };

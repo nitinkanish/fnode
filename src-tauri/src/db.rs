@@ -67,6 +67,17 @@ pub fn init(path: &Path) -> rusqlite::Result<Connection> {
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS metrics_history (
+            ts INTEGER PRIMARY KEY,
+            cpu REAL NOT NULL,
+            memory REAL NOT NULL,
+            swap REAL NOT NULL,
+            disk REAL NOT NULL,
+            rx REAL NOT NULL,
+            tx REAL NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_metrics_history_ts ON metrics_history(ts);
         "#,
     )?;
     Ok(conn)
@@ -208,4 +219,53 @@ pub fn set_setting(conn: &Connection, key: &str, value: &str) -> rusqlite::Resul
 pub fn delete_setting(conn: &Connection, key: &str) -> rusqlite::Result<()> {
     conn.execute("DELETE FROM settings WHERE key = ?1", params![key])?;
     Ok(())
+}
+
+pub fn insert_metrics(
+    conn: &Connection,
+    ts: i64,
+    cpu: f32,
+    memory: f32,
+    swap: f32,
+    disk: f32,
+    rx: f64,
+    tx: f64,
+) -> rusqlite::Result<()> {
+    conn.execute(
+        "INSERT OR REPLACE INTO metrics_history (ts, cpu, memory, swap, disk, rx, tx)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![ts, cpu, memory, swap, disk, rx, tx],
+    )?;
+    conn.execute(
+        "DELETE FROM metrics_history WHERE ts < ?1",
+        params![ts - 30 * 24 * 60 * 60],
+    )?;
+    Ok(())
+}
+
+pub fn list_metrics(conn: &Connection, since_ts: i64, bucket_secs: i64) -> rusqlite::Result<Vec<crate::models::MetricsPoint>> {
+    let bucket = bucket_secs.max(20);
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT
+            (ts / ?2) * ?2 AS bucket,
+            AVG(cpu), AVG(memory), AVG(swap), AVG(disk), AVG(rx), AVG(tx)
+        FROM metrics_history
+        WHERE ts >= ?1
+        GROUP BY bucket
+        ORDER BY bucket ASC
+        "#,
+    )?;
+    let rows = stmt.query_map(params![since_ts, bucket], |row| {
+        Ok(crate::models::MetricsPoint {
+            ts: row.get(0)?,
+            cpu: row.get(1)?,
+            memory: row.get(2)?,
+            swap: row.get(3)?,
+            disk: row.get(4)?,
+            rx: row.get(5)?,
+            tx: row.get(6)?,
+        })
+    })?;
+    rows.collect()
 }

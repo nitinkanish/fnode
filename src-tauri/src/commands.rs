@@ -5,13 +5,15 @@ use tauri::State;
 
 use crate::ai_detector;
 use crate::assistant;
+use crate::brew;
 use crate::cache;
 use crate::control;
 use crate::db;
 use crate::docker;
 use crate::models::{
-    AppSettings, AssistantReply, CacheClearResult, CacheEntry, CacheGuide, DevProcess,
-    DockerOverview, LiveSnapshot, LogResult, PortInfo, Project, SettingsUpdate, SystemSnapshot,
+    AppSettings, AssistantReply, BrewOutdated, CacheClearResult, CacheEntry, CacheGuide, DevProcess,
+    DockerOverview, LiveSnapshot, LogResult, MetricsPoint, PortInfo, Project, SettingsUpdate,
+    SystemSnapshot,
 };
 use crate::project_detector;
 use crate::state::{self, AppState};
@@ -404,6 +406,11 @@ pub fn get_settings(state: State<AppState>) -> Result<AppSettings, String> {
         .flatten()
         .map(|v| !v.is_empty())
         .unwrap_or(false);
+    let privacy_sensors_enabled = db::get_setting(&db, "privacy_sensors_enabled")
+        .ok()
+        .flatten()
+        .map(|v| v != "false")
+        .unwrap_or(true);
     drop(db);
 
     Ok(AppSettings {
@@ -412,6 +419,7 @@ pub fn get_settings(state: State<AppState>) -> Result<AppSettings, String> {
         poll_interval_ms,
         project_roots,
         has_openai_key,
+        privacy_sensors_enabled,
         paths: state.app_paths(),
     })
 }
@@ -442,8 +450,39 @@ pub fn save_settings(state: State<AppState>, update: SettingsUpdate) -> Result<A
                 db::set_setting(&db, "openai_api_key", &key).map_err(|e| e.to_string())?;
             }
         }
+        if let Some(enabled) = update.privacy_sensors_enabled {
+            db::set_setting(
+                &db,
+                "privacy_sensors_enabled",
+                if enabled { "true" } else { "false" },
+            )
+            .map_err(|e| e.to_string())?;
+        }
     }
     get_settings(state)
+}
+
+#[tauri::command]
+pub fn get_metrics_history(state: State<AppState>, range: String) -> Result<Vec<MetricsPoint>, String> {
+    let (secs, bucket) = match range.as_str() {
+        "30d" => (30 * 24 * 60 * 60, 60 * 60),
+        _ => (7 * 24 * 60 * 60, 5 * 60),
+    };
+    let since = chrono::Utc::now().timestamp() - secs;
+    let db = state.lock_db();
+    db::list_metrics(&db, since, bucket).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_brew_outdated(force: Option<bool>) -> Result<BrewOutdated, String> {
+    Ok(brew::outdated(force.unwrap_or(false)))
+}
+
+#[tauri::command]
+pub async fn brew_upgrade(name: String) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || brew::upgrade(&name))
+        .await
+        .map_err(|err| err.to_string())?
 }
 
 fn project_roots_from_settings(state: &AppState) -> Vec<PathBuf> {

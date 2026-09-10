@@ -13,6 +13,7 @@ import { ProjectsPage } from "@/pages/ProjectsPage";
 import { DockerPage } from "@/pages/DockerPage";
 import { AiModelsPage } from "@/pages/AiModelsPage";
 import { CachePage } from "@/pages/CachePage";
+import { BrewPage } from "@/pages/BrewPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 
 export function AppShell() {
@@ -21,7 +22,9 @@ export function AppShell() {
   const refreshProjects = useAppStore((s) => s.refreshProjects);
   const refreshDocker = useAppStore((s) => s.refreshDocker);
   const refreshAi = useAppStore((s) => s.refreshAi);
+  const refreshBrew = useAppStore((s) => s.refreshBrew);
   const loadSettings = useAppStore((s) => s.loadSettings);
+  const loadMetrics = useAppStore((s) => s.loadMetrics);
   const pollMs = Math.max(useAppStore((s) => s.settings?.pollIntervalMs ?? 20_000), 10_000);
   const error = useAppStore((s) => s.error);
 
@@ -33,7 +36,8 @@ export function AppShell() {
     void refreshDocker();
     void refreshAi();
     void loadSettings();
-  }, [refreshProjects, refreshDocker, refreshAi, loadSettings]);
+    void loadMetrics();
+  }, [refreshProjects, refreshDocker, refreshAi, loadSettings, loadMetrics]);
   usePolling(slower, Math.max(pollMs * 3, 60_000), true);
 
   useEffect(() => {
@@ -43,7 +47,13 @@ export function AppShell() {
     if (page === "ai") {
       void refreshAi();
     }
-  }, [page, refreshLive, refreshAi]);
+    if (page === "brew") {
+      void refreshBrew();
+    }
+    if (page === "dashboard") {
+      void loadMetrics();
+    }
+  }, [page, refreshLive, refreshAi, refreshBrew, loadMetrics]);
 
   return (
     <div className="flex h-full bg-background">
@@ -64,6 +74,7 @@ export function AppShell() {
             {page === "projects" && <ProjectsPage />}
             {page === "docker" && <DockerPage />}
             {page === "ai" && <AiModelsPage />}
+            {page === "brew" && <BrewPage />}
             {page === "cache" && <CachePage />}
             {page === "settings" && <SettingsPage />}
           </main>

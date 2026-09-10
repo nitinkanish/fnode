@@ -5,9 +5,11 @@ import type {
   AiService,
   AppNotice,
   AppSettings,
+  BrewOutdated,
   DockerOverview,
   HistoryPoint,
   LiveSnapshot,
+  MetricsPoint,
   PageId,
   PortInfo,
   DevProcess,
@@ -28,6 +30,9 @@ interface AppStore {
   aiServices: AiService[];
   settings: AppSettings | null;
   history: HistoryPoint[];
+  metricsHistory: MetricsPoint[];
+  metricsRange: "7d" | "30d";
+  brew: BrewOutdated | null;
   notices: AppNotice[];
   unreadNotices: number;
   markNoticesRead: () => void;
@@ -43,6 +48,8 @@ interface AppStore {
   refreshDocker: () => Promise<void>;
   refreshAi: () => Promise<void>;
   loadSettings: () => Promise<void>;
+  loadMetrics: (range?: "7d" | "30d") => Promise<void>;
+  refreshBrew: (force?: boolean) => Promise<void>;
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
@@ -58,6 +65,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
   aiServices: [],
   settings: null,
   history: [],
+  metricsHistory: [],
+  metricsRange: "7d",
+  brew: null,
   notices: [],
   unreadNotices: 0,
   markNoticesRead: () => set({ unreadNotices: 0 }),
@@ -147,6 +157,25 @@ export const useAppStore = create<AppStore>((set, get) => ({
       set({ error: error instanceof Error ? error.message : String(error) });
     }
   },
+
+  loadMetrics: async (range) => {
+    const next = range ?? get().metricsRange;
+    try {
+      const metricsHistory = await api.metricsHistory(next);
+      set({ metricsHistory, metricsRange: next });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : String(error) });
+    }
+  },
+
+  refreshBrew: async (force = false) => {
+    try {
+      const brew = await api.brewOutdated(force);
+      set({ brew });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : String(error) });
+    }
+  },
 }));
 
 function fallbackHealth(snapshot: LiveSnapshot): SystemHealth {
@@ -191,6 +220,23 @@ function normalizeSnapshot(snapshot: LiveSnapshot): LiveSnapshot {
       startedAt: app.startedAt ?? 0,
     })),
     health: snapshot.health ?? fallbackHealth(snapshot),
+    privacy: snapshot.privacy ?? {
+      cameraActive: false,
+      microphoneActive: false,
+      cameraApps: [],
+      microphoneApps: [],
+    },
+    battery: snapshot.battery ?? {
+      present: false,
+      percent: null,
+      cycleCount: null,
+      designCapacity: null,
+      maxCapacity: null,
+      maxCapacityPct: null,
+      condition: "Unknown",
+      charging: false,
+      drainers: [],
+    },
     processes: (snapshot.processes ?? []).map((proc) => ({
       ...proc,
       software: proc.software || proc.displayName || proc.name,

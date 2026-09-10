@@ -1,10 +1,13 @@
-import { AppWindow, Box, Cpu, FolderGit2, HardDrive, HeartPulse, Radio, Sparkles, Wifi } from "lucide-react";
+import { useEffect } from "react";
+import { AppWindow, BatteryCharging, Box, Camera, Cpu, FolderGit2, HardDrive, HeartPulse, Mic, Radio, Sparkles, Wifi } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppIcon } from "@/components/shared/AppIcon";
 import { CoreBars, NativeAreaChart, UsageBar } from "@/components/charts/NativeCharts";
+import { HistoryCharts } from "@/components/charts/HistoryCharts";
 import { formatBytes, formatPercent, formatRate, formatUptime, localhostUrl } from "@/lib/format";
 import { api } from "@/services/tauri";
 import { useAppStore } from "@/store/appStore";
@@ -21,8 +24,15 @@ function HealthStat({ label, value }: { label: string; value: string }) {
 export function DashboardPage() {
   const overview = useAppStore((s) => s.overview);
   const history = useAppStore((s) => s.history);
+  const metricsHistory = useAppStore((s) => s.metricsHistory);
+  const metricsRange = useAppStore((s) => s.metricsRange);
+  const loadMetrics = useAppStore((s) => s.loadMetrics);
   const setPage = useAppStore((s) => s.setPage);
   const loading = useAppStore((s) => s.loading);
+
+  useEffect(() => {
+    void loadMetrics(metricsRange);
+  }, [loadMetrics, metricsRange]);
 
   if (!overview) {
     return (
@@ -93,6 +103,11 @@ export function DashboardPage() {
         </Card>
       )}
 
+      <div className="grid gap-3 xl:grid-cols-2">
+        <PrivacyPanel />
+        <BatteryPanel />
+      </div>
+
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           title="CPU"
@@ -154,21 +169,33 @@ export function DashboardPage() {
       <div className="grid gap-3 xl:grid-cols-3">
         <Card className="xl:col-span-2">
           <CardHeader className="flex-row items-center justify-between">
-            <CardTitle>CPU, memory, swap</CardTitle>
-            <p className="text-[11px] text-muted-foreground">Last {history.length} snapshots</p>
+            <CardTitle>CPU, memory, disk</CardTitle>
+            <Tabs value={metricsRange} onValueChange={(value) => void loadMetrics(value === "30d" ? "30d" : "7d")}>
+              <TabsList>
+                <TabsTrigger value="7d">7 days</TabsTrigger>
+                <TabsTrigger value="30d">30 days</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </CardHeader>
           <CardContent className="h-56">
-            <NativeAreaChart
-              data={history}
-              max={100}
-              height={220}
-              formatTip={(key, value) => `${key === "cpu" ? "CPU" : key === "memory" ? "RAM" : "Swap"} ${value.toFixed(0)}%`}
-              series={[
-                { key: "cpu", label: "CPU", color: "#f38064" },
-                { key: "memory", label: "RAM", color: "#38bdf8" },
-                { key: "swap", label: "Swap", color: "#fbbf24" },
-              ]}
-            />
+            {metricsHistory.length > 0 ? (
+              <HistoryCharts data={metricsHistory} kind="system" />
+            ) : (
+              <NativeAreaChart
+                data={history}
+                max={100}
+                height={220}
+                formatTip={(key, value) => `${key === "cpu" ? "CPU" : key === "memory" ? "RAM" : "Swap"} ${value.toFixed(0)}%`}
+                series={[
+                  { key: "cpu", label: "CPU", color: "#f38064" },
+                  { key: "memory", label: "RAM", color: "#38bdf8" },
+                  { key: "swap", label: "Swap", color: "#fbbf24" },
+                ]}
+              />
+            )}
+            {metricsHistory.length === 0 && (
+              <p className="mt-2 text-[11px] text-muted-foreground">Live window until SQLite has 7-day samples.</p>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -189,15 +216,19 @@ export function DashboardPage() {
               </div>
             </div>
             <div className="h-36">
-              <NativeAreaChart
-                data={history}
-                height={140}
-                formatTip={(key, value) => `${key === "rx" ? "Down" : "Up"} ${formatRate(value)}`}
-                series={[
-                  { key: "rx", label: "Down", color: "#34d399" },
-                  { key: "tx", label: "Up", color: "#818cf8" },
-                ]}
-              />
+              {metricsHistory.length > 0 ? (
+                <HistoryCharts data={metricsHistory} kind="network" />
+              ) : (
+                <NativeAreaChart
+                  data={history}
+                  height={140}
+                  formatTip={(key, value) => `${key === "rx" ? "Down" : "Up"} ${formatRate(value)}`}
+                  series={[
+                    { key: "rx", label: "Down", color: "#34d399" },
+                    { key: "tx", label: "Up", color: "#818cf8" },
+                  ]}
+                />
+              )}
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground">
               Total {formatBytes(system.networkRxBytes)} in · {formatBytes(system.networkTxBytes)} out
@@ -317,6 +348,117 @@ export function DashboardPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function PrivacyPanel() {
+  const privacy = useAppStore((s) => s.overview?.privacy);
+  const enabled = useAppStore((s) => s.settings?.privacySensorsEnabled ?? true);
+  if (!enabled) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Camera className="h-3.5 w-3.5" /> Camera & microphone
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-xs text-muted-foreground">Sensor watch is off in Settings.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+  const camera = privacy?.cameraApps ?? [];
+  const mic = privacy?.microphoneApps ?? [];
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between">
+        <CardTitle className="flex items-center gap-2">
+          <Camera className="h-3.5 w-3.5" /> Camera & microphone
+        </CardTitle>
+        <div className="flex gap-1">
+          <Badge variant={privacy?.cameraActive ? "danger" : "secondary"}>{privacy?.cameraActive ? "Cam on" : "Cam idle"}</Badge>
+          <Badge variant={privacy?.microphoneActive ? "warning" : "secondary"}>{privacy?.microphoneActive ? "Mic on" : "Mic idle"}</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {camera.length === 0 && mic.length === 0 && (
+          <p className="text-xs text-muted-foreground">No app is holding a camera or mic device in this snapshot.</p>
+        )}
+        {camera.map((app) => (
+          <div key={`cam-${app.pid}`} className="flex items-center gap-2 text-sm">
+            <AppIcon src={app.icon} name={app.software} size="sm" />
+            <Camera className="h-3 w-3 text-red-400" />
+            <span className="truncate">{app.software}</span>
+          </div>
+        ))}
+        {mic.map((app) => (
+          <div key={`mic-${app.pid}`} className="flex items-center gap-2 text-sm">
+            <AppIcon src={app.icon} name={app.software} size="sm" />
+            <Mic className="h-3 w-3 text-amber-400" />
+            <span className="truncate">{app.software}</span>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function BatteryPanel() {
+  const battery = useAppStore((s) => s.overview?.battery);
+  if (!battery?.present) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BatteryCharging className="h-3.5 w-3.5" /> Battery
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-xs text-muted-foreground">No internal battery reported (desktop, or ioreg unavailable).</p>
+        </CardContent>
+      </Card>
+    );
+  }
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between">
+        <CardTitle className="flex items-center gap-2">
+          <BatteryCharging className="h-3.5 w-3.5" /> Battery
+        </CardTitle>
+        <Badge variant={battery.condition === "Normal" ? "success" : battery.condition === "Fair" ? "warning" : "danger"}>
+          {battery.condition}
+        </Badge>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-3 gap-2 text-sm">
+          <div>
+            <div className="text-lg font-semibold">{battery.percent != null ? `${battery.percent.toFixed(0)}%` : "—"}</div>
+            <p className="text-[11px] text-muted-foreground">{battery.charging ? "Charging" : "Charge"}</p>
+          </div>
+          <div>
+            <div className="text-lg font-semibold">{battery.maxCapacityPct != null ? `${battery.maxCapacityPct.toFixed(0)}%` : "—"}</div>
+            <p className="text-[11px] text-muted-foreground">Max capacity</p>
+          </div>
+          <div>
+            <div className="text-lg font-semibold">{battery.cycleCount ?? "—"}</div>
+            <p className="text-[11px] text-muted-foreground">Cycles</p>
+          </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Drain ranking uses CPU share from the live snapshot. macOS Energy Impact needs sudo powermetrics.
+        </p>
+        {battery.drainers.map((row) => (
+          <UsageBar
+            key={row.name}
+            value={Math.min(100, row.cpu)}
+            label={row.name}
+            detail={formatPercent(row.cpu)}
+            icon={<AppIcon src={row.icon} name={row.name} size="sm" />}
+          />
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 

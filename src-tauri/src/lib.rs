@@ -1,6 +1,8 @@
 mod ai_detector;
 mod app_icon;
 mod assistant;
+mod battery;
+mod brew;
 mod cache;
 mod commands;
 mod control;
@@ -12,10 +14,12 @@ mod health;
 mod models;
 mod paths;
 mod port_scanner;
+mod privacy;
 mod process_scanner;
 mod project_detector;
 mod state;
 mod system_monitor;
+mod tray;
 
 use state::AppState;
 use sysinfo::{ProcessesToUpdate, System};
@@ -41,6 +45,9 @@ pub fn run() {
             sys.refresh_processes(ProcessesToUpdate::All, true);
 
             app.manage(AppState::new(db, sys, data_dir));
+            if let Err(err) = tray::install(app) {
+                eprintln!("tray icon skipped: {err}");
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -75,6 +82,9 @@ pub fn run() {
             commands::ask_assistant,
             commands::get_settings,
             commands::save_settings,
+            commands::get_metrics_history,
+            commands::get_brew_outdated,
+            commands::brew_upgrade,
         ])
         .build(tauri::generate_context!())
         .expect("error while building FNode")
