@@ -76,7 +76,36 @@ export interface LiveSnapshot {
   health: SystemHealth;
   privacy: PrivacyStatus;
   battery: BatteryStatus;
+  usage: UsageSummary;
+  automationAlerts: AutomationAlert[];
   paths: AppPaths;
+}
+
+export interface UsageSummary {
+  enabled: boolean;
+  todayUsd: number;
+  monthUsd: number;
+  todayTokens: number;
+  monthTokens: number;
+}
+
+export interface AutomationRule {
+  id: number;
+  enabled: boolean;
+  name: string;
+  conditionType: string;
+  threshold: number;
+  durationSecs: number;
+  actionType: string;
+}
+
+export interface AutomationAlert {
+  id: string;
+  severity: string;
+  title: string;
+  body: string;
+  action: string | null;
+  pids: number[];
 }
 
 export type DashboardOverview = LiveSnapshot;
@@ -122,6 +151,7 @@ export interface MetricsPoint {
   disk: number;
   rx: number;
   tx: number;
+  [key: string]: number;
 }
 
 export interface BrewPackage {
@@ -273,6 +303,8 @@ export interface AppNotice {
   title: string;
   body: string;
   ts: number;
+  action?: string;
+  pids?: number[];
 }
 
 export interface Project {
@@ -285,6 +317,10 @@ export interface Project {
   lastModified: string | null;
   createdAt: string;
   isRunning: boolean;
+  gitDirty: number;
+  gitAhead: number;
+  gitBehind: number;
+  gitHasRemote: boolean;
 }
 
 export interface DockerContainer {
@@ -364,6 +400,8 @@ export interface AppSettings {
   projectRoots: string[];
   hasOpenaiKey: boolean;
   privacySensorsEnabled: boolean;
+  costTrackingEnabled: boolean;
+  hasAnthropicKey: boolean;
   paths: AppPaths;
 }
 

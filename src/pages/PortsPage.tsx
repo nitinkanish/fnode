@@ -8,7 +8,8 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { LogViewer } from "@/components/shared/LogViewer";
 import { UsageRow, compactGrid } from "@/components/shared/UsageRow";
-import { formatBytes, formatPercent, localhostUrl } from "@/lib/format";
+import { dbKind, dbLabel, openListener } from "@/lib/databases";
+import { formatBytes, formatPercent } from "@/lib/format";
 import { api } from "@/services/tauri";
 import { useAppStore } from "@/store/appStore";
 import type { LogResult, PortInfo } from "@/types";
@@ -132,18 +133,31 @@ export function PortsPage() {
                     percent={Math.min(ramShare, 100)}
                   />
                   <div className="flex flex-wrap gap-1">
-                    {uniquePorts.slice(0, 8).map((port) => (
-                      <button
-                        key={`${port.port}-${port.address}`}
-                        type="button"
-                        title={`${port.protocol} ${port.address}:${port.port}`}
-                        className="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 font-mono text-[11px] text-primary hover:bg-secondary"
-                        onClick={() => void api.openUrl(localhostUrl(port.port, port.address))}
-                      >
-                        :{port.port}
-                        <ExternalLink className="h-3 w-3" />
-                      </button>
-                    ))}
+                    {uniquePorts.slice(0, 8).map((port) => {
+                      const kind = dbKind(port);
+                      return (
+                        <button
+                          key={`${port.port}-${port.address}`}
+                          type="button"
+                          title={
+                            kind
+                              ? `Open ${dbLabel(kind)} on ${port.address}:${port.port}`
+                              : `${port.protocol} ${port.address}:${port.port}`
+                          }
+                          className="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 font-mono text-[11px] text-primary hover:bg-secondary"
+                          onClick={() => void openListener(port)}
+                        >
+                          :{port.port}
+                          {kind ? (
+                            <Badge variant="outline" className="px-1 py-0 text-[9px]">
+                              {dbLabel(kind)}
+                            </Badge>
+                          ) : (
+                            <ExternalLink className="h-3 w-3" />
+                          )}
+                        </button>
+                      );
+                    })}
                     {uniquePorts.length > 8 && (
                       <Badge variant="secondary" className="px-1 py-0 text-[10px]">
                         +{uniquePorts.length - 8}

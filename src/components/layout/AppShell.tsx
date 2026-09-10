@@ -4,6 +4,7 @@ import { TopBar } from "@/components/layout/TopBar";
 import { AssistantPanel } from "@/components/assistant/AssistantPanel";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { usePolling } from "@/hooks/usePolling";
+import { useNativeMenu } from "@/hooks/useNativeMenu";
 import { useAppStore } from "@/store/appStore";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { AppsPage } from "@/pages/AppsPage";
@@ -27,6 +28,7 @@ export function AppShell() {
   const loadMetrics = useAppStore((s) => s.loadMetrics);
   const pollMs = Math.max(useAppStore((s) => s.settings?.pollIntervalMs ?? 20_000), 10_000);
   const error = useAppStore((s) => s.error);
+  useNativeMenu();
 
   const live = useCallback(() => refreshLive(), [refreshLive]);
   usePolling(live, pollMs, true);
@@ -61,12 +63,12 @@ export function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
         {error && (
-          <div className="no-drag border-b border-destructive/30 bg-destructive/10 px-6 py-2 text-xs text-destructive">
+          <div className="no-drag border-b border-destructive/30 bg-destructive/10 px-5 py-1.5 text-[12px] text-destructive">
             {error}
           </div>
         )}
         <ScrollArea className="flex-1">
-          <main className="p-6">
+          <main className="p-5">
             {page === "dashboard" && <DashboardPage />}
             {page === "apps" && <AppsPage />}
             {page === "ports" && <PortsPage />}

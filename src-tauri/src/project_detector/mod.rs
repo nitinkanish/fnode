@@ -6,7 +6,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::SystemTime;
 
 use walkdir::{DirEntry, WalkDir};
 
@@ -117,6 +116,10 @@ fn describe_project(path: &Path) -> Project {
         last_modified,
         created_at: String::new(),
         is_running: false,
+        git_dirty: 0,
+        git_ahead: 0,
+        git_behind: 0,
+        git_has_remote: false,
     }
 }
 
@@ -224,9 +227,4 @@ fn read_joined(path: &Path, names: &[&str]) -> String {
         .collect::<Vec<_>>()
         .join("\n")
         .to_lowercase()
-}
-
-#[allow(dead_code)]
-pub fn system_time_now() -> SystemTime {
-    SystemTime::now()
 }

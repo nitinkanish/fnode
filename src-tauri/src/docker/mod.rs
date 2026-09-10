@@ -240,14 +240,3 @@ pub fn open_shell(name: &str) -> Result<(), String> {
         .map_err(|err| err.to_string())?;
     Ok(())
 }
-
-#[allow(dead_code)]
-pub async fn running_count() -> (bool, usize, usize) {
-    let overview = overview().await;
-    let running = overview
-        .containers
-        .iter()
-        .filter(|c| c.state.eq_ignore_ascii_case("running"))
-        .count();
-    (overview.available, overview.containers.len(), running)
-}

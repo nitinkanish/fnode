@@ -37,7 +37,7 @@ export function AssistantPanel() {
   return (
     <div
       className={cn(
-        "flex h-full w-[380px] shrink-0 flex-col border-l border-border bg-card transition-[width,opacity]",
+        "flex h-full w-[320px] shrink-0 flex-col border-l border-border bg-card pt-[52px] transition-[width,opacity]",
         open ? "opacity-100" : "w-0 overflow-hidden border-0 opacity-0",
       )}
     >

@@ -2,7 +2,7 @@ use std::path::Path;
 
 use rusqlite::{params, Connection};
 
-use crate::models::{DockerContainer, PortInfo, Project};
+use crate::models::{AutomationRule, DockerContainer, PortInfo, Project};
 
 pub const DB_FILENAME: &str = "fnode.db";
 
@@ -78,6 +78,28 @@ pub fn init(path: &Path) -> rusqlite::Result<Connection> {
             tx REAL NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_metrics_history_ts ON metrics_history(ts);
+
+        CREATE TABLE IF NOT EXISTS usage_events (
+            id TEXT PRIMARY KEY,
+            ts INTEGER NOT NULL,
+            provider TEXT NOT NULL,
+            model TEXT,
+            input_tokens INTEGER NOT NULL DEFAULT 0,
+            output_tokens INTEGER NOT NULL DEFAULT 0,
+            usd REAL NOT NULL DEFAULT 0,
+            source TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_usage_events_ts ON usage_events(ts);
+
+        CREATE TABLE IF NOT EXISTS automations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            name TEXT NOT NULL,
+            condition_type TEXT NOT NULL,
+            threshold REAL NOT NULL,
+            duration_secs INTEGER NOT NULL,
+            action_type TEXT NOT NULL
+        );
         "#,
     )?;
     Ok(conn)
@@ -128,6 +150,10 @@ pub fn list_projects(conn: &Connection) -> rusqlite::Result<Vec<Project>> {
             last_modified: row.get(6)?,
             created_at: row.get(7)?,
             is_running: false,
+            git_dirty: 0,
+            git_ahead: 0,
+            git_behind: 0,
+            git_has_remote: false,
         })
     })?;
     rows.collect()
@@ -268,4 +294,93 @@ pub fn list_metrics(conn: &Connection, since_ts: i64, bucket_secs: i64) -> rusql
         })
     })?;
     rows.collect()
+}
+
+pub fn insert_usage(
+    conn: &Connection,
+    id: &str,
+    ts: i64,
+    provider: &str,
+    model: Option<&str>,
+    input_tokens: i64,
+    output_tokens: i64,
+    usd: f64,
+    source: &str,
+) -> rusqlite::Result<bool> {
+    let changed = conn.execute(
+        r#"
+        INSERT OR IGNORE INTO usage_events (id, ts, provider, model, input_tokens, output_tokens, usd, source)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+        "#,
+        params![id, ts, provider, model, input_tokens, output_tokens, usd, source],
+    )?;
+    Ok(changed > 0)
+}
+
+pub fn usage_totals(conn: &Connection, since_ts: i64) -> rusqlite::Result<(f64, i64)> {
+    conn.query_row(
+        "SELECT COALESCE(SUM(usd), 0), COALESCE(SUM(input_tokens + output_tokens), 0)
+         FROM usage_events WHERE ts >= ?1",
+        params![since_ts],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )
+}
+
+pub fn list_automations(conn: &Connection) -> rusqlite::Result<Vec<AutomationRule>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, enabled, name, condition_type, threshold, duration_secs, action_type FROM automations ORDER BY id",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        let enabled: i64 = row.get(1)?;
+        Ok(AutomationRule {
+            id: row.get(0)?,
+            enabled: enabled != 0,
+            name: row.get(2)?,
+            condition_type: row.get(3)?,
+            threshold: row.get(4)?,
+            duration_secs: {
+                let v: i64 = row.get(5)?;
+                v.max(0) as u64
+            },
+            action_type: row.get(6)?,
+        })
+    })?;
+    rows.collect()
+}
+
+pub fn insert_automation(conn: &Connection, rule: &AutomationRule) -> rusqlite::Result<i64> {
+    conn.execute(
+        "INSERT INTO automations (enabled, name, condition_type, threshold, duration_secs, action_type)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![
+            if rule.enabled { 1 } else { 0 },
+            rule.name,
+            rule.condition_type,
+            rule.threshold,
+            rule.duration_secs as i64,
+            rule.action_type,
+        ],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
+pub fn update_automation(conn: &Connection, rule: &AutomationRule) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE automations SET enabled = ?1, name = ?2, condition_type = ?3, threshold = ?4, duration_secs = ?5, action_type = ?6 WHERE id = ?7",
+        params![
+            if rule.enabled { 1 } else { 0 },
+            rule.name,
+            rule.condition_type,
+            rule.threshold,
+            rule.duration_secs as i64,
+            rule.action_type,
+            rule.id,
+        ],
+    )?;
+    Ok(())
+}
+
+pub fn delete_automation(conn: &Connection, id: i64) -> rusqlite::Result<()> {
+    conn.execute("DELETE FROM automations WHERE id = ?1", params![id])?;
+    Ok(())
 }

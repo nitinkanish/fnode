@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { compactGrid } from "@/components/shared/UsageRow";
-import { homeRelative, localhostUrl } from "@/lib/format";
+import { homeRelative } from "@/lib/format";
+import { openListener } from "@/lib/databases";
 import { APP_NAME } from "@/brand";
 import { api } from "@/services/tauri";
 import { useAppStore } from "@/store/appStore";
@@ -74,6 +75,29 @@ export function ProjectsPage() {
                         {project.gitBranch}
                       </Badge>
                     )}
+                    {project.gitBranch && project.gitDirty > 0 && (
+                      <Badge variant="warning" className="px-1 py-0 text-[10px]">
+                        {project.gitDirty} dirty
+                      </Badge>
+                    )}
+                    {project.gitAhead > 0 && (
+                      <Badge variant="outline" className="px-1 py-0 text-[10px]">
+                        ↑{project.gitAhead}
+                      </Badge>
+                    )}
+                    {project.gitBehind > 0 && (
+                      <Badge variant="outline" className="px-1 py-0 text-[10px]">
+                        ↓{project.gitBehind}
+                      </Badge>
+                    )}
+                    {project.gitBranch &&
+                      project.gitDirty === 0 &&
+                      project.gitAhead === 0 &&
+                      project.gitBehind === 0 && (
+                        <Badge variant="success" className="px-1 py-0 text-[10px]">
+                          {project.gitHasRemote ? "synced" : "clean"}
+                        </Badge>
+                      )}
                     {project.lastModified && (
                       <span className="text-[11px] text-muted-foreground">{project.lastModified}</span>
                     )}
@@ -85,7 +109,7 @@ export function ProjectsPage() {
                           key={`${app.pid}-${app.port}`}
                           type="button"
                           className="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 font-mono text-[11px] text-primary hover:bg-secondary"
-                          onClick={() => void api.openUrl(localhostUrl(app.port, app.address))}
+                          onClick={() => void openListener(app)}
                         >
                           :{app.port}
                           <ExternalLink className="h-3 w-3" />

@@ -1,16 +1,19 @@
 mod ai_detector;
 mod app_icon;
 mod assistant;
+mod automations;
 mod battery;
 mod brew;
 mod cache;
 mod commands;
 mod control;
 mod db;
+mod db_connect;
 mod dock_icon;
 mod docker;
-mod error;
+mod git;
 mod health;
+mod menu;
 mod models;
 mod paths;
 mod port_scanner;
@@ -20,6 +23,7 @@ mod project_detector;
 mod state;
 mod system_monitor;
 mod tray;
+mod usage;
 
 use state::AppState;
 use sysinfo::{ProcessesToUpdate, System};
@@ -30,7 +34,8 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
+        .menu(menu::build)
+        .on_menu_event(menu::on_event)
         .setup(|app| {
             let data_dir = app.path().app_data_dir().expect("app data directory");
             std::fs::create_dir_all(&data_dir)?;
@@ -78,6 +83,7 @@ pub fn run() {
             commands::open_folder,
             commands::open_in_cursor,
             commands::open_url,
+            commands::open_homepage,
             commands::get_logs,
             commands::ask_assistant,
             commands::get_settings,
@@ -85,12 +91,30 @@ pub fn run() {
             commands::get_metrics_history,
             commands::get_brew_outdated,
             commands::brew_upgrade,
+            commands::open_database,
+            commands::list_automations,
+            commands::save_automation,
+            commands::delete_automation,
+            commands::refresh_usage,
         ])
         .build(tauri::generate_context!())
         .expect("error while building FNode")
-        .run(|_app, event| {
-            if let tauri::RunEvent::Ready = event {
-                dock_icon::apply();
+        .run(|app, event| {
+            match event {
+                tauri::RunEvent::Ready => dock_icon::apply(),
+                tauri::RunEvent::WindowEvent {
+                    label,
+                    event: tauri::WindowEvent::CloseRequested { api, .. },
+                    ..
+                } => {
+                    if label == "main" {
+                        api.prevent_close();
+                        if let Some(window) = app.get_webview_window(&label) {
+                            let _ = window.hide();
+                        }
+                    }
+                }
+                _ => {}
             }
         });
 }

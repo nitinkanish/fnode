@@ -23,9 +23,9 @@
         "hiddenTitle": true,
         "trafficLightPosition": {
           "x": 16,
-          "y": 18
+          "y": 20
         },
-        "backgroundColor": "#09090b"
+        "backgroundColor": "#F2F2F7"
       }
     ],
     "security": {

@@ -6,6 +6,7 @@ use std::time::Instant;
 use rusqlite::Connection;
 use sysinfo::{Networks, ProcessesToUpdate, System};
 
+use crate::automations;
 use crate::battery;
 use crate::db;
 use crate::health;
@@ -16,6 +17,7 @@ use crate::privacy;
 use crate::process_scanner;
 use crate::system_monitor::{self, NetSample, DB_WRITE_TTL, LIVE_TTL};
 use crate::tray;
+use crate::usage;
 
 struct LiveCache {
     at: Option<Instant>,
@@ -39,6 +41,7 @@ pub struct AppState {
     pub docker_cache: Mutex<DockerCountCache>,
     last_db_write: Mutex<Option<Instant>>,
     net_prev: Mutex<Option<NetSample>>,
+    rule_holds: Mutex<HashMap<String, Instant>>,
 }
 
 impl AppState {
@@ -61,6 +64,7 @@ impl AppState {
             }),
             last_db_write: Mutex::new(None),
             net_prev: Mutex::new(None),
+            rule_holds: Mutex::new(HashMap::new()),
         }
     }
 
@@ -189,10 +193,16 @@ impl AppState {
             .map(|v| v != "false")
             .unwrap_or(true);
         let privacy = privacy::scan(&processes, privacy_enabled);
-        tray::apply_current(&privacy);
         let battery = battery::snapshot(&software_groups);
 
-        LiveSnapshot {
+        let db = self.lock_db();
+        let cost_on = db::get_setting(&db, "cost_tracking_enabled")
+            .ok()
+            .flatten()
+            .map(|v| v == "true")
+            .unwrap_or(false);
+        let usage = usage::summary(&db, cost_on);
+        let mut snapshot = LiveSnapshot {
             system,
             open_ports: ports.len(),
             docker_containers,
@@ -211,8 +221,17 @@ impl AppState {
             health,
             privacy,
             battery,
+            usage,
+            automation_alerts: Vec::new(),
             paths: self.app_paths(),
+        };
+        {
+            let mut holds = self.rule_holds.lock().unwrap_or_else(|e| e.into_inner());
+            snapshot.automation_alerts = automations::evaluate(&db, &snapshot, &mut holds);
         }
+        drop(db);
+        tray::apply_status(&snapshot.privacy, &snapshot.usage);
+        snapshot
     }
 
     fn maybe_persist(&self, snapshot: &LiveSnapshot) {
@@ -270,6 +289,9 @@ impl AppState {
             snapshot.system.network_rx_per_sec,
             snapshot.system.network_tx_per_sec,
         );
+        if snapshot.usage.enabled {
+            let _ = crate::usage::scrape_cursor_logs(&db);
+        }
     }
 }
 

@@ -10,6 +10,16 @@ export function formatPercent(value: number): string {
   return `${Math.max(0, value).toFixed(1)}%`;
 }
 
+export function formatUsd(value: number): string {
+  return `$${Math.max(0, value).toFixed(2)}`;
+}
+
+export function formatTokens(value: number): string {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
+  return String(Math.max(0, Math.round(value)));
+}
+
 export function formatRate(bytesPerSec: number): string {
   return `${formatBytes(bytesPerSec)}/s`;
 }
@@ -59,10 +69,3 @@ export function parentFolder(path: string): string {
 export function folderName(path: string): string {
   return path.split("/").filter(Boolean).pop() ?? path;
 }
-
-export const chartTooltip = {
-  background: "#18181b",
-  border: "1px solid #3f3f46",
-  borderRadius: 8,
-  fontSize: 12,
-};

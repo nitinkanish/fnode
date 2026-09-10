@@ -4,7 +4,7 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager};
 
-use crate::models::PrivacyStatus;
+use crate::models::{PrivacyStatus, UsageSummary};
 
 static APP: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
 
@@ -42,29 +42,37 @@ pub fn install(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub fn apply_current(privacy: &PrivacyStatus) {
-    if let Some(app) = APP.get() {
-        apply(app, privacy);
-    }
-}
-
-pub fn apply(app: &tauri::AppHandle, privacy: &PrivacyStatus) {
+pub fn apply_status(privacy: &PrivacyStatus, usage: &UsageSummary) {
+    let Some(app) = APP.get() else {
+        return;
+    };
     let Some(tray) = app.tray_by_id("privacy") else {
         return;
     };
-    let title = match (privacy.camera_active, privacy.microphone_active) {
+    let sensor = match (privacy.camera_active, privacy.microphone_active) {
         (true, true) => Some("Cam+Mic"),
         (true, false) => Some("Cam"),
         (false, true) => Some("Mic"),
         (false, false) => None,
     };
-    let _ = tray.set_title(title);
-    let tip = match (privacy.camera_active, privacy.microphone_active) {
-        (true, true) => "Camera and microphone in use",
-        (true, false) => "Camera in use",
-        (false, true) => "Microphone in use",
-        (false, false) => "FNode — sensors idle",
+    let title = if sensor.is_none() && usage.enabled && usage.today_usd > 0.0 {
+        Some(format!("${:.2}", usage.today_usd))
+    } else {
+        sensor.map(|s| s.to_string())
     };
+    let _ = tray.set_title(title.as_deref());
+    let mut tip = match (privacy.camera_active, privacy.microphone_active) {
+        (true, true) => "Camera and microphone in use".to_string(),
+        (true, false) => "Camera in use".into(),
+        (false, true) => "Microphone in use".into(),
+        (false, false) => "FNode — sensors idle".into(),
+    };
+    if usage.enabled {
+        tip.push_str(&format!(
+            " · ${:.2} today / ${:.2} this month",
+            usage.today_usd, usage.month_usd
+        ));
+    }
     let _ = tray.set_tooltip(Some(tip));
 }
 

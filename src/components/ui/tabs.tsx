@@ -1,42 +1,107 @@
-import * as React from "react";
-import * as TabsPrimitive from "@radix-ui/react-tabs";
+import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-const Tabs = TabsPrimitive.Root;
+interface TabsContextValue {
+  value: string;
+  setValue: (value: string) => void;
+}
 
-const TabsList = React.forwardRef<
-  React.ComponentRef<typeof TabsPrimitive.List>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.List
-    ref={ref}
-    className={cn("inline-flex h-9 items-center rounded-lg bg-secondary p-1 text-muted-foreground", className)}
-    {...props}
-  />
-));
-TabsList.displayName = TabsPrimitive.List.displayName;
+const TabsContext = createContext<TabsContextValue | null>(null);
 
-const TabsTrigger = React.forwardRef<
-  React.ComponentRef<typeof TabsPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.Trigger
-    ref={ref}
-    className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow",
-      className,
-    )}
-    {...props}
-  />
-));
-TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
+function useTabs() {
+  const ctx = useContext(TabsContext);
+  if (!ctx) throw new Error("Tabs components must be used within Tabs");
+  return ctx;
+}
 
-const TabsContent = React.forwardRef<
-  React.ComponentRef<typeof TabsPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.Content ref={ref} className={cn("mt-4 focus-visible:outline-none", className)} {...props} />
-));
-TabsContent.displayName = TabsPrimitive.Content.displayName;
+export function Tabs({
+  defaultValue = "",
+  value,
+  onValueChange,
+  className,
+  children,
+}: {
+  defaultValue?: string;
+  value?: string;
+  onValueChange?: (value: string) => void;
+  className?: string;
+  children: ReactNode;
+}) {
+  const [uncontrolled, setUncontrolled] = useState(defaultValue);
+  const current = value ?? uncontrolled;
+  const ctx = useMemo(
+    () => ({
+      value: current,
+      setValue: (next: string) => {
+        if (value === undefined) setUncontrolled(next);
+        onValueChange?.(next);
+      },
+    }),
+    [current, onValueChange, value],
+  );
+  return (
+    <TabsContext.Provider value={ctx}>
+      <div className={className}>{children}</div>
+    </TabsContext.Provider>
+  );
+}
 
-export { Tabs, TabsList, TabsTrigger, TabsContent };
+export function TabsList({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <div
+      role="tablist"
+      className={cn(
+        "inline-flex h-7 items-center rounded-[7px] bg-secondary p-0.5 text-muted-foreground",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function TabsTrigger({
+  value,
+  className,
+  children,
+}: {
+  value: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  const { value: current, setValue } = useTabs();
+  const active = current === value;
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      data-state={active ? "active" : "inactive"}
+      className={cn(
+        "inline-flex items-center justify-center whitespace-nowrap rounded-[6px] px-2.5 py-0.5 text-[12px] font-medium transition-all focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-[0_0.5px_1px_rgba(0,0,0,0.12)]",
+        className,
+      )}
+      onClick={() => setValue(value)}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function TabsContent({
+  value,
+  className,
+  children,
+}: {
+  value: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  const { value: current } = useTabs();
+  if (current !== value) return null;
+  return (
+    <div role="tabpanel" className={cn("mt-3 focus-visible:outline-none", className)}>
+      {children}
+    </div>
+  );
+}

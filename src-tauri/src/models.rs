@@ -71,7 +71,54 @@ pub struct LiveSnapshot {
     pub health: SystemHealth,
     pub privacy: PrivacyStatus,
     pub battery: BatteryStatus,
+    pub usage: UsageSummary,
+    pub automation_alerts: Vec<AutomationAlert>,
     pub paths: AppPaths,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UsageSummary {
+    pub enabled: bool,
+    pub today_usd: f64,
+    pub month_usd: f64,
+    pub today_tokens: i64,
+    pub month_tokens: i64,
+}
+
+impl UsageSummary {
+    pub fn disabled() -> Self {
+        Self {
+            enabled: false,
+            today_usd: 0.0,
+            month_usd: 0.0,
+            today_tokens: 0,
+            month_tokens: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRule {
+    pub id: i64,
+    pub enabled: bool,
+    pub name: String,
+    pub condition_type: String,
+    pub threshold: f64,
+    pub duration_secs: u64,
+    pub action_type: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationAlert {
+    pub id: String,
+    pub severity: String,
+    pub title: String,
+    pub body: String,
+    pub action: Option<String>,
+    pub pids: Vec<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -349,6 +396,10 @@ pub struct Project {
     pub last_modified: Option<String>,
     pub created_at: String,
     pub is_running: bool,
+    pub git_dirty: i64,
+    pub git_ahead: i64,
+    pub git_behind: i64,
+    pub git_has_remote: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -448,6 +499,8 @@ pub struct AppSettings {
     pub project_roots: Vec<String>,
     pub has_openai_key: bool,
     pub privacy_sensors_enabled: bool,
+    pub cost_tracking_enabled: bool,
+    pub has_anthropic_key: bool,
     pub paths: AppPaths,
 }
 
@@ -461,4 +514,6 @@ pub struct SettingsUpdate {
     /// If Some, replace the stored key. Empty string clears it. Never echoed back.
     pub openai_api_key: Option<String>,
     pub privacy_sensors_enabled: Option<bool>,
+    pub cost_tracking_enabled: Option<bool>,
+    pub anthropic_api_key: Option<String>,
 }

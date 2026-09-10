@@ -1,14 +1,16 @@
-import { useEffect } from "react";
-import { AppWindow, BatteryCharging, Box, Camera, Cpu, FolderGit2, HardDrive, HeartPulse, Mic, Radio, Sparkles, Wifi } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AppWindow, BatteryCharging, Box, Camera, Cpu, DollarSign, FolderGit2, HardDrive, HeartPulse, Mic, Radio, Sparkles, Wifi } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppIcon } from "@/components/shared/AppIcon";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { CoreBars, NativeAreaChart, UsageBar } from "@/components/charts/NativeCharts";
 import { HistoryCharts } from "@/components/charts/HistoryCharts";
-import { formatBytes, formatPercent, formatRate, formatUptime, localhostUrl } from "@/lib/format";
+import { dbKind, dbLabel, openListener } from "@/lib/databases";
+import { formatBytes, formatPercent, formatRate, formatTokens, formatUsd, formatUptime } from "@/lib/format";
 import { api } from "@/services/tauri";
 import { useAppStore } from "@/store/appStore";
 
@@ -29,6 +31,8 @@ export function DashboardPage() {
   const loadMetrics = useAppStore((s) => s.loadMetrics);
   const setPage = useAppStore((s) => s.setPage);
   const loading = useAppStore((s) => s.loading);
+  const refreshLive = useAppStore((s) => s.refreshLive);
+  const [stopOffer, setStopOffer] = useState<{ title: string; pids: number[] } | null>(null);
 
   useEffect(() => {
     void loadMetrics(metricsRange);
@@ -70,6 +74,32 @@ export function DashboardPage() {
         </div>
       )}
 
+      {(overview.automationAlerts?.length ?? 0) > 0 && (
+        <div className="space-y-2">
+          {overview.automationAlerts.map((alert) => (
+            <div
+              key={alert.id}
+              className="flex items-start justify-between gap-3 rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-3 text-sm text-sky-100"
+            >
+              <div>
+                <div className="font-medium">{alert.title}</div>
+                <p className="mt-0.5 text-xs opacity-80">{alert.body}</p>
+              </div>
+              {alert.action === "stop" && alert.pids.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="h-7 shrink-0"
+                  onClick={() => setStopOffer({ title: alert.title, pids: alert.pids })}
+                >
+                  Offer stop
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {health && (
         <Card>
           <CardHeader className="flex-row items-center justify-between">
@@ -103,9 +133,10 @@ export function DashboardPage() {
         </Card>
       )}
 
-      <div className="grid gap-3 xl:grid-cols-2">
+      <div className="grid gap-3 xl:grid-cols-3">
         <PrivacyPanel />
         <BatteryPanel />
+        <UsagePanel />
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -187,9 +218,9 @@ export function DashboardPage() {
                 height={220}
                 formatTip={(key, value) => `${key === "cpu" ? "CPU" : key === "memory" ? "RAM" : "Swap"} ${value.toFixed(0)}%`}
                 series={[
-                  { key: "cpu", label: "CPU", color: "#f38064" },
-                  { key: "memory", label: "RAM", color: "#38bdf8" },
-                  { key: "swap", label: "Swap", color: "#fbbf24" },
+                  { key: "cpu", label: "CPU", color: "#007AFF" },
+                  { key: "memory", label: "RAM", color: "#34C759" },
+                  { key: "swap", label: "Swap", color: "#FF9F0A" },
                 ]}
               />
             )}
@@ -224,8 +255,8 @@ export function DashboardPage() {
                   height={140}
                   formatTip={(key, value) => `${key === "rx" ? "Down" : "Up"} ${formatRate(value)}`}
                   series={[
-                    { key: "rx", label: "Down", color: "#34d399" },
-                    { key: "tx", label: "Up", color: "#818cf8" },
+                    { key: "rx", label: "Down", color: "#34C759" },
+                    { key: "tx", label: "Up", color: "#007AFF" },
                   ]}
                 />
               )}
@@ -328,25 +359,42 @@ export function DashboardPage() {
             {overview.topPorts.length === 0 && (
               <p className="text-xs text-muted-foreground">No listening TCP ports detected.</p>
             )}
-            {overview.topPorts.map((port) => (
-              <div
-                key={`${port.pid}-${port.port}-${port.address}`}
-                className="flex items-center justify-between rounded-lg bg-secondary/60 px-3 py-2"
-              >
-                <div>
-                  <div className="text-sm font-medium">{port.displayName}</div>
-                  <div className="font-mono text-[11px] text-muted-foreground">
-                    {port.address}:{port.port} · PID {port.pid}
+            {overview.topPorts.map((port) => {
+              const kind = dbKind(port);
+              return (
+                <div
+                  key={`${port.pid}-${port.port}-${port.address}`}
+                  className="flex items-center justify-between rounded-lg bg-secondary/60 px-3 py-2"
+                >
+                  <div>
+                    <div className="text-sm font-medium">{port.displayName}</div>
+                    <div className="font-mono text-[11px] text-muted-foreground">
+                      {port.address}:{port.port} · PID {port.pid}
+                      {kind ? ` · ${dbLabel(kind)}` : ""}
+                    </div>
                   </div>
+                  <Button size="sm" variant="outline" onClick={() => void openListener(port)}>
+                    {kind ? `Open ${dbLabel(kind)}` : "Open"}
+                  </Button>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => void api.openUrl(localhostUrl(port.port, port.address))}>
-                  Open
-                </Button>
-              </div>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(stopOffer)}
+        onOpenChange={(open) => !open && setStopOffer(null)}
+        title={`Stop ${stopOffer?.title ?? "process"}?`}
+        description="Idle servers are only stopped after you confirm. SIGTERM first, then SIGKILL if they stay alive."
+        confirmLabel="Stop"
+        onConfirm={() => {
+          const pids = stopOffer?.pids ?? [];
+          void api.quitCompletely(pids).then(refreshLive);
+          setStopOffer(null);
+        }}
+      />
     </div>
   );
 }
@@ -426,7 +474,17 @@ function BatteryPanel() {
         <CardTitle className="flex items-center gap-2">
           <BatteryCharging className="h-3.5 w-3.5" /> Battery
         </CardTitle>
-        <Badge variant={battery.condition === "Normal" ? "success" : battery.condition === "Fair" ? "warning" : "danger"}>
+        <Badge
+          variant={
+            battery.condition === "Normal"
+              ? "success"
+              : battery.condition === "Fair"
+                ? "warning"
+                : battery.condition === "Unknown"
+                  ? "secondary"
+                  : "danger"
+          }
+        >
           {battery.condition}
         </Badge>
       </CardHeader>
@@ -457,6 +515,58 @@ function BatteryPanel() {
             icon={<AppIcon src={row.icon} name={row.name} size="sm" />}
           />
         ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function UsagePanel() {
+  const usage = useAppStore((s) => s.overview?.usage);
+  const setPage = useAppStore((s) => s.setPage);
+  const refreshUsage = useAppStore((s) => s.refreshUsage);
+  if (!usage?.enabled) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="h-3.5 w-3.5" /> API spend
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Cost tracking is off. Turn it on in Settings to estimate Cursor / OpenAI spend from local logs.
+          </p>
+          <Button size="sm" variant="outline" onClick={() => setPage("settings")}>
+            Settings
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between">
+        <CardTitle className="flex items-center gap-2">
+          <DollarSign className="h-3.5 w-3.5" /> API spend
+        </CardTitle>
+        <Button size="sm" variant="ghost" onClick={() => void refreshUsage()}>
+          Refresh
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <div className="text-lg font-semibold">{formatUsd(usage.todayUsd)}</div>
+            <p className="text-[11px] text-muted-foreground">Today · {formatTokens(usage.todayTokens)} tok</p>
+          </div>
+          <div>
+            <div className="text-lg font-semibold">{formatUsd(usage.monthUsd)}</div>
+            <p className="text-[11px] text-muted-foreground">30 days · {formatTokens(usage.monthTokens)} tok</p>
+          </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Estimates from Cursor logs under your home folder. OpenAI org costs are optional and never echo the key.
+        </p>
       </CardContent>
     </Card>
   );

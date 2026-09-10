@@ -222,13 +222,18 @@ pub fn build_context(
 }
 
 fn extract_port(question: &str) -> Option<u16> {
-    let re = regex::Regex::new(r"\b(\d{2,5})\b").ok()?;
-    for cap in re.captures_iter(question) {
-        let Some(n) = cap.get(1).and_then(|m| m.as_str().parse::<u32>().ok()) else {
-            continue;
-        };
-        if (80..=65535).contains(&n) {
-            return u16::try_from(n).ok();
+    let mut n = 0u32;
+    let mut in_num = false;
+    for c in question.chars().chain(std::iter::once(' ')) {
+        if c.is_ascii_digit() {
+            in_num = true;
+            n = n.saturating_mul(10).saturating_add(u32::from(c as u8 - b'0'));
+        } else if in_num {
+            if (80..=65535).contains(&n) {
+                return u16::try_from(n).ok();
+            }
+            n = 0;
+            in_num = false;
         }
     }
     None

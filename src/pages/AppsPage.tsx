@@ -7,7 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppIcon } from "@/components/shared/AppIcon";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { formatBytes, formatPercent, formatUptime, localhostUrl } from "@/lib/format";
+import { formatBytes, formatPercent, formatUptime } from "@/lib/format";
+import { dbKind, dbLabel, openListener } from "@/lib/databases";
 import { UsageRow, compactGrid } from "@/components/shared/UsageRow";
 import { api } from "@/services/tauri";
 import { useAppStore } from "@/store/appStore";
@@ -269,18 +270,33 @@ function LocalGroupCard({
           percent={Math.min(ramShare, 100)}
         />
         <div className="flex flex-wrap gap-1">
-          {group.apps.slice(0, 6).map((app) => (
-            <button
-              key={`${app.pid}-${app.port}-${app.address}`}
-              type="button"
-              title={app.project ? `${app.name} · ${app.project}` : app.name}
-              className="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 font-mono text-[11px] text-primary hover:bg-secondary"
-              onClick={() => void api.openUrl(localhostUrl(app.port, app.address))}
-            >
-              :{app.port}
-              <ExternalLink className="h-3 w-3" />
-            </button>
-          ))}
+          {group.apps.slice(0, 6).map((app) => {
+            const kind = dbKind(app);
+            return (
+              <button
+                key={`${app.pid}-${app.port}-${app.address}`}
+                type="button"
+                title={
+                  kind
+                    ? `Open ${dbLabel(kind)} on :${app.port}`
+                    : app.project
+                      ? `${app.name} · ${app.project}`
+                      : app.name
+                }
+                className="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 font-mono text-[11px] text-primary hover:bg-secondary"
+                onClick={() => void openListener(app)}
+              >
+                :{app.port}
+                {kind ? (
+                  <Badge variant="outline" className="px-1 py-0 text-[9px]">
+                    {dbLabel(kind)}
+                  </Badge>
+                ) : (
+                  <ExternalLink className="h-3 w-3" />
+                )}
+              </button>
+            );
+          })}
           {group.apps.length > 6 && (
             <Badge variant="secondary" className="px-1 py-0 text-[10px]">
               +{group.apps.length - 6}

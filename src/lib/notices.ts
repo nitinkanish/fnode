@@ -9,6 +9,7 @@ export function ingestNotices(prev: LiveSnapshot | null, next: LiveSnapshot): Ap
   const health = next.health;
   const localhost = next.localhostApps ?? [];
   const groups = next.softwareGroups ?? [];
+  const automation = next.automationAlerts ?? [];
 
   const active = new Set<string>();
   for (const alert of health?.alerts ?? []) {
@@ -19,6 +20,9 @@ export function ingestNotices(prev: LiveSnapshot | null, next: LiveSnapshot): Ap
   }
   for (const group of groups) {
     if (group.cpu >= 55) active.add(`hot:${group.id}`);
+  }
+  for (const alert of automation) {
+    active.add(`auto:${alert.id}`);
   }
 
   for (const key of [...seen]) {
@@ -64,6 +68,21 @@ export function ingestNotices(prev: LiveSnapshot | null, next: LiveSnapshot): Ap
       title: `${group.name} is using high CPU`,
       body: `${group.name} is at ${group.cpu.toFixed(0)}% CPU across ${group.processCount} process${group.processCount === 1 ? "" : "es"}.`,
       ts: now,
+    });
+  }
+
+  for (const alert of automation) {
+    const key = `auto:${alert.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    incoming.push({
+      id: `${key}:${now}`,
+      severity: alert.severity === "critical" ? "critical" : alert.severity === "warning" ? "warning" : "info",
+      title: alert.title,
+      body: alert.body,
+      ts: now,
+      action: alert.action ?? undefined,
+      pids: alert.pids,
     });
   }
 

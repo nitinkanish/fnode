@@ -7,10 +7,6 @@ export interface AreaSeries {
   fill?: string;
 }
 
-interface HistoryLike {
-  [key: string]: number | undefined;
-}
-
 export function NativeAreaChart({
   data,
   series,
@@ -18,7 +14,7 @@ export function NativeAreaChart({
   height = 180,
   formatTip,
 }: {
-  data: HistoryLike[];
+  data: Array<Record<string, unknown>>;
   series: AreaSeries[];
   max?: number;
   height?: number;

@@ -3,6 +3,7 @@ import type {
   AiService,
   AppSettings,
   AssistantReply,
+  AutomationRule,
   BrewOutdated,
   CacheClearResult,
   CacheEntry,
@@ -12,6 +13,7 @@ import type {
   LogResult,
   MetricsPoint,
   Project,
+  UsageSummary,
 } from "@/types";
 
 export const api = {
@@ -50,6 +52,7 @@ export const api = {
   openFolder: (path: string) => invoke<void>("open_folder", { path }),
   openInCursor: (path: string) => invoke<void>("open_in_cursor", { path }),
   openUrl: (url: string) => invoke<void>("open_url", { url }),
+  openHomepage: () => invoke<void>("open_homepage"),
   logs: (args: { pid?: number; cwd?: string; containerId?: string }) =>
     invoke<LogResult>("get_logs", args),
   ask: (question: string) => invoke<AssistantReply>("ask_assistant", { question }),
@@ -60,4 +63,10 @@ export const api = {
     invoke<MetricsPoint[]>("get_metrics_history", { range }),
   brewOutdated: (force = false) => invoke<BrewOutdated>("get_brew_outdated", { force }),
   brewUpgrade: (name: string) => invoke<string>("brew_upgrade", { name }),
+  openDatabase: (kind: string, port: number, address: string) =>
+    invoke<void>("open_database", { kind, port, address }),
+  listAutomations: () => invoke<AutomationRule[]>("list_automations"),
+  saveAutomation: (rule: AutomationRule) => invoke<AutomationRule[]>("save_automation", { rule }),
+  deleteAutomation: (id: number) => invoke<AutomationRule[]>("delete_automation", { id }),
+  refreshUsage: () => invoke<UsageSummary>("refresh_usage"),
 };

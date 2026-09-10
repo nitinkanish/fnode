@@ -5,6 +5,7 @@ import type {
   AiService,
   AppNotice,
   AppSettings,
+  AutomationRule,
   BrewOutdated,
   DockerOverview,
   HistoryPoint,
@@ -17,11 +18,19 @@ import type {
   SystemHealth,
 } from "@/types";
 
+export type SettingsTab = "general" | "costs" | "automations" | "about";
+
 interface AppStore {
   page: PageId;
   setPage: (page: PageId) => void;
+  settingsTab: SettingsTab;
+  setSettingsTab: (tab: SettingsTab) => void;
   query: string;
   setQuery: (query: string) => void;
+  sidebarHidden: boolean;
+  toggleSidebar: () => void;
+  searchFocusAt: number;
+  focusSearch: () => void;
   overview: LiveSnapshot | null;
   ports: PortInfo[];
   processes: DevProcess[];
@@ -29,6 +38,7 @@ interface AppStore {
   docker: DockerOverview | null;
   aiServices: AiService[];
   settings: AppSettings | null;
+  automations: AutomationRule[];
   history: HistoryPoint[];
   metricsHistory: MetricsPoint[];
   metricsRange: "7d" | "30d";
@@ -48,6 +58,10 @@ interface AppStore {
   refreshDocker: () => Promise<void>;
   refreshAi: () => Promise<void>;
   loadSettings: () => Promise<void>;
+  loadAutomations: () => Promise<void>;
+  saveAutomation: (rule: AutomationRule) => Promise<void>;
+  deleteAutomation: (id: number) => Promise<void>;
+  refreshUsage: () => Promise<void>;
   loadMetrics: (range?: "7d" | "30d") => Promise<void>;
   refreshBrew: (force?: boolean) => Promise<void>;
 }
@@ -55,8 +69,14 @@ interface AppStore {
 export const useAppStore = create<AppStore>((set, get) => ({
   page: "dashboard",
   setPage: (page) => set({ page }),
+  settingsTab: "general",
+  setSettingsTab: (settingsTab) => set({ settingsTab }),
   query: "",
   setQuery: (query) => set({ query }),
+  sidebarHidden: false,
+  toggleSidebar: () => set((state) => ({ sidebarHidden: !state.sidebarHidden })),
+  searchFocusAt: 0,
+  focusSearch: () => set({ searchFocusAt: Date.now() }),
   overview: null,
   ports: [],
   processes: [],
@@ -64,6 +84,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   docker: null,
   aiServices: [],
   settings: null,
+  automations: [],
   history: [],
   metricsHistory: [],
   metricsRange: "7d",
@@ -124,7 +145,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   refreshProjects: async (scan = false) => {
     try {
-      const projects = scan ? await api.scanProjects() : await api.projects();
+      const projects = (scan ? await api.scanProjects() : await api.projects()).map(normalizeProject);
       set({ projects });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : String(error) });
@@ -156,6 +177,32 @@ export const useAppStore = create<AppStore>((set, get) => ({
     } catch (error) {
       set({ error: error instanceof Error ? error.message : String(error) });
     }
+  },
+
+  loadAutomations: async () => {
+    try {
+      const automations = await api.listAutomations();
+      set({ automations });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : String(error) });
+    }
+  },
+
+  saveAutomation: async (rule) => {
+    const automations = await api.saveAutomation(rule);
+    set({ automations });
+  },
+
+  deleteAutomation: async (id) => {
+    const automations = await api.deleteAutomation(id);
+    set({ automations });
+  },
+
+  refreshUsage: async () => {
+    const usage = await api.refreshUsage();
+    set((state) => ({
+      overview: state.overview ? { ...state.overview, usage } : state.overview,
+    }));
   },
 
   loadMetrics: async (range) => {
@@ -237,10 +284,28 @@ function normalizeSnapshot(snapshot: LiveSnapshot): LiveSnapshot {
       charging: false,
       drainers: [],
     },
+    usage: snapshot.usage ?? {
+      enabled: false,
+      todayUsd: 0,
+      monthUsd: 0,
+      todayTokens: 0,
+      monthTokens: 0,
+    },
+    automationAlerts: snapshot.automationAlerts ?? [],
     processes: (snapshot.processes ?? []).map((proc) => ({
       ...proc,
       software: proc.software || proc.displayName || proc.name,
       icon: proc.icon ?? null,
     })),
+  };
+}
+
+function normalizeProject(project: Project): Project {
+  return {
+    ...project,
+    gitDirty: project.gitDirty ?? 0,
+    gitAhead: project.gitAhead ?? 0,
+    gitBehind: project.gitBehind ?? 0,
+    gitHasRemote: project.gitHasRemote ?? false,
   };
 }

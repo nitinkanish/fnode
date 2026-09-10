@@ -11,9 +11,9 @@ use crate::control;
 use crate::db;
 use crate::docker;
 use crate::models::{
-    AppSettings, AssistantReply, BrewOutdated, CacheClearResult, CacheEntry, CacheGuide, DevProcess,
-    DockerOverview, LiveSnapshot, LogResult, MetricsPoint, PortInfo, Project, SettingsUpdate,
-    SystemSnapshot,
+    AppSettings, AssistantReply, AutomationRule, BrewOutdated, CacheClearResult, CacheEntry,
+    CacheGuide, DevProcess, DockerOverview, LiveSnapshot, LogResult, MetricsPoint, PortInfo,
+    Project, SettingsUpdate, SystemSnapshot, UsageSummary,
 };
 use crate::project_detector;
 use crate::state::{self, AppState};
@@ -53,6 +53,7 @@ pub fn scan_projects(state: State<AppState>) -> Result<Vec<Project>, String> {
     let mut stored = db::list_projects(&db).map_err(|e| e.to_string())?;
     drop(db);
     state::mark_running(&state, &mut stored);
+    crate::git::enrich(&mut stored);
     Ok(stored)
 }
 
@@ -66,6 +67,7 @@ pub fn get_projects(state: State<AppState>) -> Result<Vec<Project>, String> {
         return scan_projects(state);
     }
     state::mark_running(&state, &mut projects);
+    crate::git::enrich(&mut projects);
     Ok(projects)
 }
 
@@ -255,6 +257,16 @@ pub fn open_url(url: String) -> Result<(), String> {
     control::open_url(&url)
 }
 
+/// Allowlisted project page only — not a general URL opener.
+#[tauri::command]
+pub fn open_homepage() -> Result<(), String> {
+    std::process::Command::new("open")
+        .arg("https://github.com/nitinkanish/fnode")
+        .spawn()
+        .map_err(|err| err.to_string())?;
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn get_logs(
     state: State<'_, AppState>,
@@ -411,6 +423,16 @@ pub fn get_settings(state: State<AppState>) -> Result<AppSettings, String> {
         .flatten()
         .map(|v| v != "false")
         .unwrap_or(true);
+    let cost_tracking_enabled = db::get_setting(&db, "cost_tracking_enabled")
+        .ok()
+        .flatten()
+        .map(|v| v == "true")
+        .unwrap_or(false);
+    let has_anthropic_key = db::get_setting(&db, "anthropic_api_key")
+        .ok()
+        .flatten()
+        .map(|v| !v.is_empty())
+        .unwrap_or(false);
     drop(db);
 
     Ok(AppSettings {
@@ -420,6 +442,8 @@ pub fn get_settings(state: State<AppState>) -> Result<AppSettings, String> {
         project_roots,
         has_openai_key,
         privacy_sensors_enabled,
+        cost_tracking_enabled,
+        has_anthropic_key,
         paths: state.app_paths(),
     })
 }
@@ -458,6 +482,21 @@ pub fn save_settings(state: State<AppState>, update: SettingsUpdate) -> Result<A
             )
             .map_err(|e| e.to_string())?;
         }
+        if let Some(enabled) = update.cost_tracking_enabled {
+            db::set_setting(
+                &db,
+                "cost_tracking_enabled",
+                if enabled { "true" } else { "false" },
+            )
+            .map_err(|e| e.to_string())?;
+        }
+        if let Some(key) = update.anthropic_api_key {
+            if key.is_empty() {
+                db::delete_setting(&db, "anthropic_api_key").map_err(|e| e.to_string())?;
+            } else {
+                db::set_setting(&db, "anthropic_api_key", &key).map_err(|e| e.to_string())?;
+            }
+        }
     }
     get_settings(state)
 }
@@ -483,6 +522,70 @@ pub async fn brew_upgrade(name: String) -> Result<String, String> {
     tokio::task::spawn_blocking(move || brew::upgrade(&name))
         .await
         .map_err(|err| err.to_string())?
+}
+
+#[tauri::command]
+pub fn open_database(state: State<AppState>, kind: String, port: u16, address: String) -> Result<(), String> {
+    let ports = state.live_snapshot(true).ports;
+    crate::db_connect::open(&kind, port, &address, &ports)
+}
+
+#[tauri::command]
+pub fn list_automations(state: State<AppState>) -> Result<Vec<AutomationRule>, String> {
+    let db = state.lock_db();
+    db::list_automations(&db).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_automation(state: State<AppState>, rule: AutomationRule) -> Result<Vec<AutomationRule>, String> {
+    crate::automations::validate_rule(&rule)?;
+    let db = state.lock_db();
+    if rule.id == 0 {
+        db::insert_automation(&db, &rule).map_err(|e| e.to_string())?;
+    } else {
+        db::update_automation(&db, &rule).map_err(|e| e.to_string())?;
+    }
+    db::list_automations(&db).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_automation(state: State<AppState>, id: i64) -> Result<Vec<AutomationRule>, String> {
+    if id <= 0 {
+        return Err("Invalid automation id.".into());
+    }
+    let db = state.lock_db();
+    db::delete_automation(&db, id).map_err(|e| e.to_string())?;
+    db::list_automations(&db).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn refresh_usage(state: State<'_, AppState>) -> Result<UsageSummary, String> {
+    let enabled = {
+        let db = state.lock_db();
+        db::get_setting(&db, "cost_tracking_enabled")
+            .ok()
+            .flatten()
+            .map(|v| v == "true")
+            .unwrap_or(false)
+    };
+    if !enabled {
+        return Ok(UsageSummary::disabled());
+    }
+    let openai_key = {
+        let db = state.lock_db();
+        db::get_setting(&db, "openai_api_key").ok().flatten()
+    };
+    {
+        let db = state.lock_db();
+        let _ = crate::usage::scrape_cursor_logs(&db);
+    }
+    if let Some(key) = openai_key {
+        let rows = crate::usage::fetch_openai(&key).await;
+        let db = state.lock_db();
+        let _ = crate::usage::store_openai_costs(&db, &rows);
+    }
+    let db = state.lock_db();
+    Ok(crate::usage::summary(&db, true))
 }
 
 fn project_roots_from_settings(state: &AppState) -> Vec<PathBuf> {
